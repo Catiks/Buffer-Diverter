@@ -10,6 +10,10 @@ analyze t1;
 analyze t1((b,c));
 select * from pg_stats where tablename = 't1' order by attname;
 select * from pg_catalog.pg_ext_stats;
+set sql_beta_feature = 'amplify_mcv';
+analyze t1;
+select * from pg_stats where tablename = 't1' order by attname;
+reset sql_beta_feature;
 
 drop table if exists t1;
 create table t1(a int, b int, c int);

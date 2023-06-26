@@ -420,7 +420,8 @@ typedef enum {
     PREDPUSH_SAME_LEVEL = 8192, /* predpush same level */
     PARTITION_FDW_ON = 16384, /* support create foreign table on partitioned table */
     DISABLE_BITMAP_COST_WITH_LOSSY_PAGES = 32768, /* stop computing bitmap path cost with lossy pages */
-    EXTRACT_PUSHDOWN_OR_CLAUSE = 65536  /* Extract restriction OR clauses. */
+    EXTRACT_PUSHDOWN_OR_CLAUSE = 65536,  /* Extract restriction OR clauses. */
+    AMPLIFY_MCV = 131072  /* more accurate MCVs */
 } sql_beta_param;
 
 typedef enum {
