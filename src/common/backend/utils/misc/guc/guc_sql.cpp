@@ -319,6 +319,7 @@ static const struct config_enum_entry sql_beta_options[] = {
     {"partition_fdw_on", PARTITION_FDW_ON, false},
     {"disable_bitmap_cost_with_lossy_pages", DISABLE_BITMAP_COST_WITH_LOSSY_PAGES, false},
     {"extract_pushdown_or_clause", EXTRACT_PUSHDOWN_OR_CLAUSE, false},
+    {"amplify_mcv", AMPLIFY_MCV, false},
     {NULL, 0, false}
 };
 

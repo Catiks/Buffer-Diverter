@@ -5404,7 +5404,7 @@ static void compute_scalar_stats(
             if (tupnoLink[tupno] == tupno) {
                 /* Reached end of duplicates of this value */
                 ndistinct++;
-                if (dups_cnt > 1) {
+                if (dups_cnt > 1 || (ENABLE_SQL_BETA_FEATURE(AMPLIFY_MCV) && samplerows < num_mcv)) {
                     nmultiple++;
                     if (track_cnt < num_mcv || dups_cnt > track[track_cnt - 1].count) {
                         /*
