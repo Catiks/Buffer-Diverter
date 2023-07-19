@@ -6537,7 +6537,7 @@ void ProcessInterrupts(void)
 
         PrintWaitEvent();
 
-        if (u_sess->ClientAuthInProgress) {
+        if (u_sess->ClientAuthInProgress && !u_sess->stream_cxt.in_waiting_quit) {
             t_thrd.int_cxt.ImmediateInterruptOK = false;        /* not idle anymore */
             int errlevel = ERROR;
             if (ENABLE_DMS && IS_THREAD_POOL_WORKER) {
