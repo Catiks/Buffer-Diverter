@@ -132,7 +132,7 @@ extern void gs_memory_init_entry(StreamSharedContext* sharedContext, int consume
 extern bool ScanMemoryStream(StreamState* node);
 extern bool gs_memory_recv(StreamState* node);
 extern void gs_memory_send(
-    TupleTableSlot* tuple, VectorBatch* batchsrc, StreamSharedContext* sharedContext, int nthChannel, int nthRow);
+    TupleTableSlot* tuple, VectorBatch* batchsrc, StreamSharedContext* sharedContext, int nthChannel, StreamLocator *loc);
 extern void gs_memory_disconnect(StreamSharedContext* sharedContext, int nthChannel);
 extern void gs_message_by_memory(StringInfo buf, StreamSharedContext* sharedContext, int nthChannel);
 extern void gs_memory_send_finish(StreamSharedContext* sharedContext, int connNum);

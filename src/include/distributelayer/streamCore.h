@@ -146,18 +146,22 @@ typedef struct TupleVector {
     int tupleCount;
 } TupleVector;
 
+typedef struct StreamSharedSubContext {
+    VectorBatch* sharedBatches;
+    TupleVector* sharedTuples;
+    StringInfo messages;
+    DataStatus status;
+    bool is_connect_end;
+    struct hash_entry* quota_entrys;
+} StreamSharedSubContext __attribute__((aligned(64)));
+
 typedef struct StreamSharedContext {
     MemoryContext localStreamMemoryCtx; /**/
-    VectorBatch*** sharedBatches;
-    TupleVector*** sharedTuples;
-    StringInfo** messages;
-    DataStatus** dataStatus;
-    bool** is_connect_end;
+    StreamSharedSubContext** subContext;
     int* scanLoc;
     TcpStreamKey key_s;
     bool vectorized;
     struct hash_entry** poll_entrys;
-    struct hash_entry*** quota_entrys;
 } StreamSharedContext;
 
 typedef struct StreamSyncParam {

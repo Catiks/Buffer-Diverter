@@ -35,6 +35,12 @@
 #define FIXED_TYPE 5
 #define NAME_TYPE 6
 
+typedef struct StreamLocator {
+    int locator[BatchMaxSize];
+    int size;
+    int pointer;
+} StreamLocator;
+
 class StreamProducer : public StreamObj {
 public:
     StreamProducer(StreamKey key, PlannedStmt* pstmt, Stream* streamNode, MemoryContext context, int socketNum,
@@ -148,7 +154,7 @@ public:
     void sendByteStream(int nthChannel);
 
     /* Copy the batch/tuple to shared memory. */
-    void sendByMemory(TupleTableSlot* tuple, VectorBatch* batchSrc, int nthChannel, int nthRow = -1);
+    void sendByMemory(TupleTableSlot* tuple, VectorBatch* batchSrc, int nthChannel, StreamLocator *loc = NULL);
 
     /* Mark local stream as finished. */
     void finalizeLocalStream();
@@ -486,7 +492,9 @@ private:
 
     int m_roundRobinIdx;
 
-    int m_locator[BatchMaxSize];
+    int m_locator;
+
+    StreamLocator* m_locatorBatch;
 
     /* The send dest for local stream to send error message. */
     int m_nth;

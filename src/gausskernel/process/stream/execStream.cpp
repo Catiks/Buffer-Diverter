@@ -317,11 +317,6 @@ static StreamSharedContext* buildLocalStreamContext(Stream* streamNode, PlannedS
 
     StreamSharedContext* sharedContext = (StreamSharedContext*)palloc0(sizeof(StreamSharedContext));
     MemoryContext localStreamMemoryCtx = NULL;
-    VectorBatch*** sharedBatches = NULL;
-    TupleVector*** sharedTuples = NULL;
-    DataStatus** dataStatus = NULL;
-    bool** is_connect_end = NULL;
-    StringInfo** messages = NULL;
     int* scanLoc = NULL;
     char context_name[NODENAMELEN];
     int rc = 0;
@@ -352,42 +347,23 @@ static StreamSharedContext* buildLocalStreamContext(Stream* streamNode, PlannedS
     scanLoc = (int*)palloc0(sizeof(int) * consumerNum);
 
     /* Init data status. */
-    dataStatus = (DataStatus**)palloc(sizeof(DataStatus*) * consumerNum);
-    is_connect_end = (bool**)palloc(sizeof(bool*) * consumerNum);
-    messages = (StringInfo**)palloc(sizeof(StringInfo*) * consumerNum);
+    StreamSharedSubContext** subContext = NULL;
+    subContext = (StreamSharedSubContext**)palloc(sizeof(StreamSharedSubContext*) * consumerNum);
     for (int i = 0; i < consumerNum; i++) {
-        dataStatus[i] = (DataStatus*)palloc(sizeof(DataStatus) * producerNum);
-        is_connect_end[i] = (bool*)palloc(sizeof(bool) * producerNum);
-        messages[i] = (StringInfo*)palloc(sizeof(StringInfo) * producerNum);
+        subContext[i] = (StreamSharedSubContext*)TYPEALIGN(64,
+                            ((StreamSharedSubContext*)palloc0(sizeof(StreamSharedSubContext) * producerNum + 64)));
         for (int j = 0; j < producerNum; j++) {
-            dataStatus[i][j] = DATA_EMPTY;
-            is_connect_end[i][j] = false;
-            messages[i][j] = (StringInfoData*)palloc0(sizeof(StringInfoData));
-            initStringInfo(messages[i][j]);
-        }
-    }
-
-    /* Init shared batches or tuples */
-    if (IsA((Plan*)streamNode, VecStream)) {
-        sharedBatches = (VectorBatch***)palloc(sizeof(VectorBatch**) * consumerNum);
-        for (int i = 0; i < consumerNum; i++) {
-            sharedBatches[i] = (VectorBatch**)palloc0(sizeof(VectorBatch*) * producerNum);
-        }
-    } else {
-        sharedTuples = (TupleVector***)palloc(sizeof(TupleVector**) * consumerNum);
-        for (int i = 0; i < consumerNum; i++) {
-            sharedTuples[i] = (TupleVector**)palloc0(sizeof(TupleVector*) * producerNum);
+            subContext[i][j].status = DATA_EMPTY;
+            subContext[i][j].is_connect_end = false;
+            subContext[i][j].messages = (StringInfoData*)palloc0(sizeof(StringInfoData));
+            initStringInfo(subContext[i][j].messages);
         }
     }
 
     sharedContext->vectorized = IsA(&(streamNode->scan.plan), VecStream);
     sharedContext->localStreamMemoryCtx = localStreamMemoryCtx;
-    sharedContext->sharedBatches = sharedBatches;
-    sharedContext->sharedTuples = sharedTuples;
-    sharedContext->dataStatus = dataStatus;
-    sharedContext->is_connect_end = is_connect_end;
-    sharedContext->messages = messages;
     sharedContext->scanLoc = scanLoc;
+    sharedContext->subContext = subContext;
 
     /* Set stream key. */
     sharedContext->key_s.queryId = pstmt->queryId;
@@ -413,11 +389,11 @@ static void resetLocalStreamContext(StreamSharedContext* context)
         return;
 
     context->scanLoc[0] = 0;
-    context->dataStatus[0][0] = DATA_EMPTY;
-    context->is_connect_end[0][0] = false;
-    resetStringInfo(context->messages[0][0]);
+    context->subContext[0][0].status = DATA_EMPTY;
+    context->subContext[0][0].is_connect_end = false;
+    resetStringInfo(context->subContext[0][0].messages);
 
-    context->sharedTuples[0][0]->tuplePointer = 0;
+    context->subContext[0][0].sharedTuples->tuplePointer = 0;
 }
 
 static RecursiveUnion* GetRecursiveUnionSubPlan(PlannedStmt* pstmt, int subplanid)

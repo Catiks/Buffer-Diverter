@@ -89,25 +89,21 @@ void gs_memory_init_entry(StreamSharedContext* sharedContext, int consumerNum, i
 {
     struct hash_entry* entry = NULL;
     struct hash_entry** poll_entrys = NULL;
-    struct hash_entry*** quota_entrys = NULL;
 
     poll_entrys = (struct hash_entry**)palloc(sizeof(struct hash_entry*) * consumerNum);
-    quota_entrys = (struct hash_entry***)palloc(sizeof(struct hash_entry**) * consumerNum);
 
     for (int i = 0; i < consumerNum; i++) {
         entry = (struct hash_entry*)palloc(sizeof(struct hash_entry));
         (void)entry->_init();
         poll_entrys[i] = entry;
-        quota_entrys[i] = (struct hash_entry**)palloc(sizeof(struct hash_entry*) * producerNum);
         for (int j = 0; j < producerNum; j++) {
             entry = (struct hash_entry*)palloc(sizeof(struct hash_entry));
             (void)entry->_init();
-            quota_entrys[i][j] = entry;
+            sharedContext->subContext[i][j].quota_entrys = entry;
         }
     }
 
     sharedContext->poll_entrys = poll_entrys;
-    sharedContext->quota_entrys = quota_entrys;
 }
 
 /*
@@ -123,13 +119,13 @@ void gs_message_by_memory(StringInfo buf, StreamSharedContext* sharedContext, in
     struct hash_entry* entry = NULL;
 
     /* Copy Error/Notice messages to shared context. */
-    buf_dst = sharedContext->messages[nthChannel][u_sess->stream_cxt.smp_id];
+    buf_dst = sharedContext->subContext[nthChannel][u_sess->stream_cxt.smp_id].messages;
 
     /*
      * If producer is waked up and shared buffer has been consumed while waiting,
      * it can continue to append data to its messages of sharedContext.
      */
-    entry = sharedContext->quota_entrys[nthChannel][u_sess->stream_cxt.smp_id];
+    entry = sharedContext->subContext[nthChannel][u_sess->stream_cxt.smp_id].quota_entrys;
     while (buf_dst->len > 0) {
         (void)entry->_timewait(SINGLE_WAITQUOTA);
     }
@@ -147,7 +143,7 @@ void gs_message_by_memory(StringInfo buf, StreamSharedContext* sharedContext, in
 void gs_memory_disconnect(StreamSharedContext* sharedContext, int nthChannel)
 {
     struct hash_entry* entry = NULL;
-    sharedContext->dataStatus[nthChannel][u_sess->stream_cxt.smp_id] = CONN_ERR;
+    sharedContext->subContext[nthChannel][u_sess->stream_cxt.smp_id].status = CONN_ERR;
     entry = sharedContext->poll_entrys[nthChannel];
     entry->_signal();
 }
@@ -162,12 +158,12 @@ void gs_memory_disconnect(StreamSharedContext* sharedContext, int nthChannel)
 bool gs_is_databuff_empty(StreamSharedContext* sharedContext, int nthChannel)
 {
     if (sharedContext->vectorized) {
-        VectorBatch* batch = sharedContext->sharedBatches[nthChannel][u_sess->stream_cxt.smp_id];
+        VectorBatch* batch = sharedContext->subContext[nthChannel][u_sess->stream_cxt.smp_id].sharedBatches;
         if (batch->m_rows == 0) {
             return true;
         }
     } else {
-        TupleVector* tupleVec = sharedContext->sharedTuples[nthChannel][u_sess->stream_cxt.smp_id];
+        TupleVector* tupleVec = sharedContext->subContext[nthChannel][u_sess->stream_cxt.smp_id].sharedTuples;
         if (tupleVec->tuplePointer == 0) {
             return true;
         }
@@ -183,16 +179,18 @@ bool gs_is_databuff_empty(StreamSharedContext* sharedContext, int nthChannel)
  * @param[IN] batchsrc: batch to be send
  * @param[IN] sharedContext: context for shared memory stream
  * @param[IN] nthChannel: destination consumer
- * @param[IN] nthRow: the Nth row to be sent in batch
+ * @param[IN] loc: the rows to be sent to same consumer in batch
  */
 void gs_memory_send(
-    TupleTableSlot* tuple, VectorBatch* batchsrc, StreamSharedContext* sharedContext, int nthChannel, int nthRow)
+    TupleTableSlot* tuple, VectorBatch* batchsrc, StreamSharedContext* sharedContext, int nthChannel, StreamLocator *loc)
 {
-    VectorBatch* batch = NULL;
+    StreamSharedSubContext* subContext;
     TupleVector* tupleVec = NULL;
     bool ready_to_send = false;
-    DataStatus dataStatus;
     struct hash_entry* entry = NULL;
+    Assert(sharedContext->subContext != NULL);
+    
+    subContext = &(sharedContext->subContext[nthChannel][u_sess->stream_cxt.smp_id]);
 
     WaitState oldStatus = pgstat_report_waitstatus_comm(STATE_WAIT_FLUSH_DATA,
         u_sess->pgxc_cxt.PGXCNodeId,
@@ -201,54 +199,51 @@ void gs_memory_send(
         global_node_definition ? global_node_definition->num_nodes : -1);
 
     StreamTimeSendStart(t_thrd.pgxc_cxt.GlobalNetInstr);
-    entry = sharedContext->quota_entrys[nthChannel][u_sess->stream_cxt.smp_id];
     for (;;) {
         /* Check for interrupt at the beginning of the loop. */
         CHECK_FOR_INTERRUPTS();
 
         /* Check if we should early stop. */
         /* Quit if the connection close, especially in a early close case. */
-        if (executorEarlyStop() || sharedContext->is_connect_end[nthChannel][u_sess->stream_cxt.smp_id]) {
+        if (executorEarlyStop() || subContext->is_connect_end) {
             (void)pgstat_report_waitstatus(oldStatus);
             return;
         }
 
-        dataStatus = sharedContext->dataStatus[nthChannel][u_sess->stream_cxt.smp_id];
-        /* Break the loop if we find quota. */
-        if ((dataStatus == DATA_EMPTY
+        if ((subContext->status == DATA_EMPTY
 #ifdef __aarch64__
              && gs_is_databuff_empty(sharedContext, nthChannel)
 #endif
              ) ||
-            dataStatus == DATA_PREPARE) {
+            subContext->status == DATA_PREPARE) {
             break;
         }
 
         StreamTimeWaitQuotaStart(t_thrd.pgxc_cxt.GlobalNetInstr);
-        (void)entry->_timewait(SINGLE_WAITQUOTA);
+        (void)subContext->quota_entrys->_timewait(SINGLE_WAITQUOTA);
         StreamTimeWaitQuotaEnd(t_thrd.pgxc_cxt.GlobalNetInstr);
     }
 
     StreamTimeCopyStart(t_thrd.pgxc_cxt.GlobalNetInstr);
     /* Copy data to shared context. */
     if (sharedContext->vectorized) {
-        Assert(sharedContext->sharedBatches != NULL);
-        batch = sharedContext->sharedBatches[nthChannel][u_sess->stream_cxt.smp_id];
         /* data copy */
-        if (-1 == nthRow) {
+        if (NULL == loc) {
             /* Do deep copy of all rows, for local roundrobin & local broadcast. */
-            Assert(batch->m_rows == 0);
-            batch->Copy<true, false>(batchsrc);
+            Assert(subContext->sharedBatches->m_rows == 0);
+            subContext->sharedBatches->Copy<true, false>(batchsrc);
             ready_to_send = true;
         } else {
-            batch->CopyNth(batchsrc, nthRow);
-            if (BatchMaxSize == batch->m_rows) {
-                ready_to_send = true;
+            for (; loc->pointer < loc->size; loc->pointer++) {
+                subContext->sharedBatches->CopyNth(batchsrc, loc->locator[loc->pointer]);
+                if (BatchMaxSize == subContext->sharedBatches->m_rows) {
+                    ready_to_send = true;
+                    break;
+                }
             }
         }
     } else {
-        Assert(sharedContext->sharedTuples != NULL);
-        tupleVec = sharedContext->sharedTuples[nthChannel][u_sess->stream_cxt.smp_id];
+        tupleVec = subContext->sharedTuples;
         int n = tupleVec->tuplePointer;
         ExecCopySlot(tupleVec->tupleVector[n], tuple);
         tupleVec->tuplePointer++;
@@ -264,12 +259,12 @@ void gs_memory_send(
         pg_memory_barrier();
 #endif
         /* set flag */
-        sharedContext->dataStatus[nthChannel][u_sess->stream_cxt.smp_id] = DATA_READY;
+        subContext->status = DATA_READY;
         /* send signal */
         entry = sharedContext->poll_entrys[nthChannel];
         entry->_signal();
     } else {
-        sharedContext->dataStatus[nthChannel][u_sess->stream_cxt.smp_id] = DATA_PREPARE;
+        subContext->status = DATA_PREPARE;
     }
     StreamTimeSendEnd(t_thrd.pgxc_cxt.GlobalNetInstr);
 
@@ -308,11 +303,12 @@ bool gs_return_tuple(StreamState* node)
 bool gs_consume_memory_data(StreamState* node, int loc)
 {
     StreamSharedContext* sharedContext = node->sharedContext;
+    StreamSharedSubContext* subContext = &(sharedContext->subContext[u_sess->stream_cxt.smp_id][loc]);
 
     NetWorkTimeCopyStart(t_thrd.pgxc_cxt.GlobalNetInstr);
     /* Take data from the shared context. */
     if (sharedContext->vectorized) {
-        VectorBatch* batchsrc = sharedContext->sharedBatches[u_sess->stream_cxt.smp_id][loc];
+        VectorBatch* batchsrc = subContext->sharedBatches;
         VectorBatch* batchdst = ((VecStreamState*)node)->m_CurrentBatch;
 
         if (batchsrc->m_rows == 0) {
@@ -323,7 +319,7 @@ bool gs_consume_memory_data(StreamState* node, int loc)
 
         batchsrc->Reset();
     } else {
-        TupleVector* tuplesrc = sharedContext->sharedTuples[u_sess->stream_cxt.smp_id][loc];
+        TupleVector* tuplesrc = subContext->sharedTuples;
         TupleVector* tupledst = node->tempTupleVec;
 
         if (tuplesrc->tuplePointer == 0) {
@@ -341,17 +337,14 @@ bool gs_consume_memory_data(StreamState* node, int loc)
     }
     NetWorkTimeCopyEnd(t_thrd.pgxc_cxt.GlobalNetInstr);
 
-    struct hash_entry* entry = NULL;
-    entry = sharedContext->quota_entrys[u_sess->stream_cxt.smp_id][loc];
-
 #ifdef __aarch64__
     pg_memory_barrier();
 #endif
     /* Reset flag */
-    sharedContext->dataStatus[u_sess->stream_cxt.smp_id][loc] = DATA_EMPTY;
+    subContext->status = DATA_EMPTY;
 
     /* send signal */
-    entry->_signal();
+    subContext->quota_entrys->_signal();
 
     node->sharedContext->scanLoc[u_sess->stream_cxt.smp_id] = loc;
     return true;
@@ -367,14 +360,12 @@ bool gs_consume_memory_data(StreamState* node, int loc)
  */
 char gs_find_memory_data(StreamState* node, int* waitnode_count)
 {
-    DataStatus dataStatus;
+    StreamSharedSubContext* subContext = NULL;
     StringInfo buf = NULL;
     int scanLoc = node->sharedContext->scanLoc[u_sess->stream_cxt.smp_id];
     int i = scanLoc;
     bool finished = true;
-    bool is_conn_end = false;
     int waitnodeCount = 0;
-    struct hash_entry* entry = NULL;
 
     /* Check if there is available data, and scan from last time location. */
     do {
@@ -384,11 +375,10 @@ char gs_find_memory_data(StreamState* node, int* waitnode_count)
         }
 
         /* Update scan location. */
+        subContext = &(node->sharedContext->subContext[u_sess->stream_cxt.smp_id][i]);
         node->sharedContext->scanLoc[u_sess->stream_cxt.smp_id] = i;
-        dataStatus = node->sharedContext->dataStatus[u_sess->stream_cxt.smp_id][i];
-        is_conn_end = node->sharedContext->is_connect_end[u_sess->stream_cxt.smp_id][i];
 
-        if (!is_conn_end) {
+        if (!subContext->is_connect_end) {
             finished = false;
             waitnodeCount++;
         }
@@ -398,7 +388,7 @@ char gs_find_memory_data(StreamState* node, int* waitnode_count)
          * If an error occured, we should stop scan now.
          * If an notice occured, we can still receive data.
          */
-        buf = node->sharedContext->messages[u_sess->stream_cxt.smp_id][i];
+        buf = subContext->messages;
         if (buf->len > 0) {
             if (buf->cursor == 'E') {
                 HandleStreamError(node, buf->data, buf->len);
@@ -408,20 +398,19 @@ char gs_find_memory_data(StreamState* node, int* waitnode_count)
                 resetStringInfo(buf);
 
                 /* After one notice message has handled, send signal and wake up the dest producer. */
-                entry = node->sharedContext->quota_entrys[u_sess->stream_cxt.smp_id][i];
-                entry->_signal();
+                subContext->quota_entrys->_signal();
 
                 return STREAM_SCAN_WAIT;
             }
         }
 
-        switch (dataStatus) {
+        switch (subContext->status) {
             case DATA_EMPTY:
                 break;
 
             case DATA_PREPARE:
                 /* Take the rest data away when the connection is end. */
-                if (is_conn_end) {
+                if (subContext->is_connect_end) {
                     /* Return data if any. */
                     if (gs_consume_memory_data(node, i)) {
                         return STREAM_SCAN_DATA;
@@ -445,7 +434,7 @@ char gs_find_memory_data(StreamState* node, int* waitnode_count)
                             node->sharedContext->key_s.planNodeId,
                             i)));
                 break;
-            // dataStatus is enum,
+            // status is enum,
             default:
                 break;
         }
@@ -530,7 +519,7 @@ void gs_memory_send_finish(StreamSharedContext* sharedContext, int connNum)
 
     for (int i = 0; i < connNum; i++) {
         /* Set flags. */
-        sharedContext->is_connect_end[i][u_sess->stream_cxt.smp_id] = true;
+        sharedContext->subContext[i][u_sess->stream_cxt.smp_id].is_connect_end = true;
 
         /* send signal */
         entry = sharedContext->poll_entrys[i];
@@ -547,19 +536,16 @@ void gs_memory_send_finish(StreamSharedContext* sharedContext, int connNum)
  */
 void gs_memory_close_conn(StreamSharedContext* sharedContext, int connNum, int consumerId)
 {
-    struct hash_entry* entry = NULL;
-
     for (int i = 0; i < connNum; i++) {
         /* Set flags. */
-        sharedContext->is_connect_end[consumerId][i] = true;
+        sharedContext->subContext[consumerId][i].is_connect_end = true;
 
         /*
          * Send signal to the producers which may be still waiting quota,
          * in a query like "limit XXX", when consumer don't need data anymore,
          * but the producers haven't send all data yet.
          */
-        entry = sharedContext->quota_entrys[consumerId][i];
-        entry->_signal();
+        sharedContext->subContext[consumerId][i].quota_entrys->_signal();
     }
 }
 

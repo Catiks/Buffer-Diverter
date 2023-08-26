@@ -109,6 +109,7 @@ StreamProducer::StreamProducer(
     m_originConsumerNodeList = NIL;
     m_originProducerExecNodeList = NIL;
     m_skewState = NULL;
+    m_locator = 0;
     m_nth = 0;
     m_roundRobinIdx = 0;
     m_distributeIdx = NULL;
@@ -151,9 +152,6 @@ StreamProducer::StreamProducer(
     }
 
     rc = memset_s(m_skewMatch, sizeof(int) * BatchMaxSize, 0, sizeof(int) * BatchMaxSize);
-    securec_check(rc, "\0", "\0");
-
-    rc = memset_s(m_locator, sizeof(int) * BatchMaxSize, 0, sizeof(int) * BatchMaxSize);
     securec_check(rc, "\0", "\0");
 
     /*
@@ -908,6 +906,10 @@ void StreamProducer::netInit()
     if (STREAM_IS_LOCAL_NODE(m_streamNode->smpDesc.distriType)) {
         /* Init shared context for local stream */
         u_sess->stream_cxt.producer_obj->initSharedContext();
+        m_locatorBatch = (StreamLocator*)palloc0(sizeof(StreamLocator) * m_parallel_desc.consumerDop);
+        for (int i = 0; i < m_parallel_desc.consumerDop; i++) {
+            m_locatorBatch[i].size = -1;
+        }
         return;
     }
 
@@ -999,7 +1001,7 @@ void StreamProducer::localRedistributeStream(TupleTableSlot* tuple)
 
     (this->*m_channelCalFun)(tuple);
 
-    sendByMemory(tuple, NULL, m_locator[0]);
+    sendByMemory(tuple, NULL, m_locator);
 }
 
 /*
@@ -1013,9 +1015,23 @@ void StreamProducer::localRedistributeStream(VectorBatch* batch)
     Assert(m_sharedContext != NULL);
 
     (this->*m_channelCalVecFun)(batch);
-
-    for (int i = 0; i < batch->m_rows; i++) {
-        sendByMemory(NULL, batch, m_locator[i], i);
+    
+    while(true) {
+        bool skip = true;
+        for (int i = 0; i < m_parallel_desc.consumerDop; i++) {
+            __builtin_prefetch(&m_sharedContext->subContext[i + 1][u_sess->stream_cxt.smp_id]);
+            if (m_locatorBatch[i].size >= 0) {
+                sendByMemory(NULL, batch, i, &m_locatorBatch[i]);
+                if (m_locatorBatch[i].pointer == m_locatorBatch[i].size) {
+                    m_locatorBatch[i].size = -1;
+                    m_locatorBatch[i].pointer = 0;
+                } else {
+                    skip = false;
+                }
+            }
+        }
+        if (skip)
+            break;
     }
 }
 
@@ -1129,7 +1145,9 @@ void StreamProducer::redistributeBatchChannel(VectorBatch* batch)
     int dop = m_parallel_desc.consumerDop;
     int nodeLen = list_length(m_consumerNodes->nodeList);
     for (int i = 0; i < batch->m_rows; i++) {
-        m_locator[i] = ChannelLocalizer<distrType>(hashValue[i], dop, nodeLen);
+        int consumer_id = ChannelLocalizer<distrType>(hashValue[i], dop, nodeLen);
+        m_locatorBatch[consumer_id].size++;
+        m_locatorBatch[consumer_id].locator[m_locatorBatch[consumer_id].size] = i;
     }
 }
 
@@ -1178,8 +1196,10 @@ void StreamProducer::redistributeBatchChannelForSlice(VectorBatch* batch)
         }
         ConstructConstFromValues(keyValues, keyNulls, KeyAttrs, colMap, keyNum, consts, constPointers);
 
-        m_locator[i] = ChannelLocalizerForSlice<distrType>(
+        int consumer_id = ChannelLocalizerForSlice<distrType>(
             hashValue, constPointers, m_parallel_desc.consumerDop);
+        m_locatorBatch[consumer_id].size++;
+        m_locatorBatch[consumer_id].locator[m_locatorBatch[consumer_id].size] = i;
     }
 }
 
@@ -1245,7 +1265,7 @@ void StreamProducer::redistributeTupleChannel(TupleTableSlot* tuple)
         }
     }
 
-    m_locator[0] = ChannelLocalizer<distrType>(
+    m_locator = ChannelLocalizer<distrType>(
         hashValue, m_parallel_desc.consumerDop, list_length(m_consumerNodes->nodeList));
 }
 
@@ -1291,7 +1311,7 @@ void StreamProducer::redistributeTupleChannelForSlice(TupleTableSlot* tuple)
     }
     ConstructConstFromValues(keyValues, keyNulls, keyAttrs, colMap, keyNum, consts, constPointers);
 
-    m_locator[0] = ChannelLocalizerForSlice<distrType>(
+    m_locator = ChannelLocalizerForSlice<distrType>(
         hashValue, constPointers, m_parallel_desc.consumerDop);
 }
 
@@ -1751,10 +1771,10 @@ int StreamProducer::findLocalChannel()
 
  * @return: void
  */
-void StreamProducer::sendByMemory(TupleTableSlot* tuple, VectorBatch* batchSrc, int nthChannel, int nthRow)
+void StreamProducer::sendByMemory(TupleTableSlot* tuple, VectorBatch* batchSrc, int nthChannel, StreamLocator *loc)
 {
-    if (m_sharedContextInit) {
-        gs_memory_send(tuple, batchSrc, m_sharedContext, nthChannel, nthRow);
+    if (likely(m_sharedContextInit)) {
+        gs_memory_send(tuple, batchSrc, m_sharedContext, nthChannel, loc);
 
         bool allInValid = true;
 
@@ -1764,7 +1784,7 @@ void StreamProducer::sendByMemory(TupleTableSlot* tuple, VectorBatch* batchSrc, 
          * anymore, and quit now.
          */
         for (int i = 0; i < m_connNum; i++) {
-            if (!m_sharedContext->is_connect_end[i][u_sess->stream_cxt.smp_id]) {
+            if (!m_sharedContext->subContext[i][u_sess->stream_cxt.smp_id].is_connect_end) {
                 allInValid = false;
                 break;
             }
@@ -1809,7 +1829,7 @@ void StreamProducer::initSharedContext()
     if (m_sharedContext->vectorized) {
         /* Init batches. */
         for (int i = 0; i < m_connNum; i++) {
-            m_sharedContext->sharedBatches[i][u_sess->stream_cxt.smp_id] =
+            m_sharedContext->subContext[i][u_sess->stream_cxt.smp_id].sharedBatches =
                 New(CurrentMemoryContext) VectorBatch(CurrentMemoryContext, m_desc);
         }
     } else {
@@ -1817,7 +1837,7 @@ void StreamProducer::initSharedContext()
         for (int i = 0; i < m_connNum; i++) {
             TupleVector* TupleVec = (TupleVector*)palloc0(sizeof(TupleVector));
             TupleVec->tupleVector = (TupleTableSlot**)palloc(sizeof(TupleTableSlot*) * TupleVectorMaxSize);
-            m_sharedContext->sharedTuples[i][u_sess->stream_cxt.smp_id] = TupleVec;
+            m_sharedContext->subContext[i][u_sess->stream_cxt.smp_id].sharedTuples = TupleVec;
 
             for (int j = 0; j < TupleVectorMaxSize; j++) {
                 TupleVec->tupleVector[j] = MakeTupleTableSlot(false);
