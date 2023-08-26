@@ -2448,6 +2448,132 @@ static double eqjoinsel_inner(
         CLAMP_PROBABILITY(otherfreq2);
 
         /*
+         * If there is a table with a small amount of data.
+         * Try using histograms to make the selectivity more accurate.
+         */
+        if (ENABLE_SQL_BETA_FEATURE(AMPLIFY_MCV) &&
+                ( (otherfreq1 > 0 && (stats1->stadistinct < 0 && stats2->stadistinct >0)) 
+                || (otherfreq2 > 0 && (stats1->stadistinct > 0 && stats2->stadistinct < 0)) ) )
+        {
+            Datum *hvalues;
+            int nhvalues;
+            double hss_num, ntuples, otherfreq;
+            Datum *mvalues;
+            int nmvalues;
+            float4 *mnumbers;
+            bool onleft;
+            double matchfreq, unmatchfreq;
+
+            do
+            {
+                /*
+                 * Only a histogram with a small enough amount of data can get an accurate ratio.
+                 * Therefore, histograms are only used when stadistinct is less than 0.
+                 */
+                if (stats1->stadistinct < 0 &&
+                        get_attstatsslot(vardata1->statsTuple, vardata1->atttype, vardata1->atttypmod,
+                        STATISTIC_KIND_HISTOGRAM, InvalidOid, NULL,
+                        &hvalues, &nhvalues, NULL, NULL))
+                {
+                    ntuples = vardata1->rel->tuples;
+                    otherfreq = otherfreq1;
+                    mvalues = values2;
+                    nmvalues = nvalues2;
+                    mnumbers = numbers2;
+                    onleft = true;
+                }
+                else if (stats2->stadistinct < 0 &&
+                        get_attstatsslot(vardata2->statsTuple, vardata2->atttype, vardata2->atttypmod,
+                        STATISTIC_KIND_HISTOGRAM, InvalidOid, NULL,
+                        &hvalues, &nhvalues, NULL, NULL))
+                {
+                    ntuples = vardata2->rel->tuples;
+                    otherfreq = otherfreq2;
+                    mvalues = values1;
+                    nmvalues = nvalues1;
+                    mnumbers = numbers1;
+                    onleft = false;
+                }
+                else
+                    break;
+
+                /*
+                * The sample points in the histogram are consistent with the amount of data
+                * in the table, indicating that the data that appears only once is in it.
+                */
+                if (nhvalues <= 0 || abs(otherfreq * ntuples - nhvalues) > 0.1)
+                {
+                    if (onleft)
+                        free_attstatsslot(vardata1->atttype, hvalues, nhvalues, NULL, 0);
+                    else
+                        free_attstatsslot(vardata2->atttype, hvalues, nhvalues, NULL, 0);
+
+                    break;
+                }
+
+                hasmatch1 = (bool *) palloc0(nhvalues * sizeof(bool));
+                hasmatch2 = (bool *) palloc0(nmvalues * sizeof(bool));
+
+                hss_num = otherfreq / nhvalues;
+
+                for (i = 0; i < nhvalues; i++)
+                {
+                    int			j;
+
+                    for (j = 0; j < nmvalues; j++)
+                    {
+                        if (hasmatch2[j])
+                            continue;
+
+                        if (DatumGetBool(FunctionCall2Coll(&eqproc, DEFAULT_COLLATION_OID, hvalues[i], mvalues[j])))
+                        {
+                            hasmatch1[i] = hasmatch2[j] = true;
+                            matchprodfreq += hss_num * mnumbers[j];
+                            nmatches++;
+
+                            break;
+                        }
+                    }
+                }
+                CLAMP_PROBABILITY(matchprodfreq);
+
+                /* Sum up frequencies of matched and unmatched HISTOGRAMs */
+                matchfreq = unmatchfreq = 0.0;
+                for (i = 0; i < nhvalues; i++)
+                {
+                    if (hasmatch1[i])
+                        matchfreq += hss_num;
+                    else
+                        unmatchfreq += hss_num;
+                }
+                CLAMP_PROBABILITY(matchfreq);
+                CLAMP_PROBABILITY(unmatchfreq);
+
+                if (onleft)
+                    free_attstatsslot(vardata1->atttype, hvalues, nhvalues, NULL, 0);
+                else
+                    free_attstatsslot(vardata2->atttype, hvalues, nhvalues, NULL, 0);
+
+                pfree(hasmatch1);
+                pfree(hasmatch2);
+
+                /* Compute the new otherfreq. */
+                if (onleft)
+                {
+                    otherfreq1 = otherfreq1 - matchfreq - unmatchfreq;
+                    CLAMP_PROBABILITY(otherfreq1);
+                }
+                else
+                {
+                    otherfreq2 = otherfreq2 - matchfreq - unmatchfreq;
+                    CLAMP_PROBABILITY(otherfreq2);
+                }
+            }
+            while(false);
+
+        }
+
+        /*
          * We can estimate the total selectivity from the point of view of
          * relation 1 as: the known selectivity for matched MCVs, plus
          * unmatched MCVs that are assumed to match against random members of
