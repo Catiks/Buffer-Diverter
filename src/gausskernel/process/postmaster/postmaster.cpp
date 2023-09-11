@@ -1017,6 +1017,7 @@ void SetShmemCxt(void)
                                        g_instance.attr.attr_sql.job_queue_processes +
                                        g_instance.attr.attr_storage.autovacuum_max_workers +
                                        g_instance.attr.attr_storage.max_undo_workers + 1 +
+                                       g_instance.attr.attr_network.MaxStreamWorkers +
                                        AUXILIARY_BACKENDS +
                                        AV_LAUNCHER_PROCS +
                                        g_max_worker_processes +

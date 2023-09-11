@@ -273,6 +273,8 @@ void InitProcGlobal(void)
 #ifndef ENABLE_THREAD_CHECK
     g_instance.proc_base->spins_per_delay = DEFAULT_SPINS_PER_DELAY;
 #endif
+    g_instance.proc_base->freeStreamWorkerProcCount = 0;
+    g_instance.proc_base->streamWorkerFreeProcs = NULL;
     g_instance.proc_base->freeProcs = NULL;
     g_instance.proc_base->externalFreeProcs = NULL;
     g_instance.proc_base->autovacFreeProcs = NULL;
@@ -452,6 +454,13 @@ void InitProcGlobal(void)
                    NUM_CMAGENT_PROCS + g_max_worker_processes + NUM_DCF_CALLBACK_PROCS + NUM_DMS_CALLBACK_PROCS) {
             procs[i]->links.next = (SHM_QUEUE*)g_instance.proc_base->bgworkerFreeProcs;
             g_instance.proc_base->bgworkerFreeProcs = procs[i];
+        } else if (i < g_instance.shmem_cxt.MaxConnections + thread_pool_stream_proc_num + AUXILIARY_BACKENDS +
+                   g_instance.attr.attr_sql.job_queue_processes + 1 +
+                   NUM_CMAGENT_PROCS + g_max_worker_processes + NUM_DCF_CALLBACK_PROCS + NUM_DMS_CALLBACK_PROCS +
+                   g_instance.attr.attr_network.MaxStreamWorkers) {
+            procs[i]->links.next = (SHM_QUEUE*)g_instance.proc_base->streamWorkerFreeProcs;
+            g_instance.proc_base->streamWorkerFreeProcs = procs[i];
+            g_instance.proc_base->freeStreamWorkerProcCount++;
         } else if (i < g_instance.shmem_cxt.MaxBackends + NUM_CMAGENT_PROCS + NUM_DCF_CALLBACK_PROCS + \
                    NUM_DMS_CALLBACK_PROCS) {
             /*
@@ -632,6 +641,8 @@ static void GetProcFromFreeList()
         t_thrd.proc = g_instance.proc_base->externalFreeProcs;
     } else if (u_sess->libpq_cxt.IsConnFromCmAgent) {
         t_thrd.proc = GetFreeCMAgentProc();
+    } else if (StreamThreadAmI()) {
+        t_thrd.proc = g_instance.proc_base->streamWorkerFreeProcs;
     } else {
 #ifndef __USE_NUMA
         t_thrd.proc = g_instance.proc_base->freeProcs;
@@ -749,6 +760,8 @@ void InitProcess(void)
             g_instance.proc_base->externalFreeProcs = (PGPROC*)t_thrd.proc->links.next;
         } else if (u_sess->libpq_cxt.IsConnFromCmAgent) {
             g_instance.proc_base->cmAgentFreeProcs = (PGPROC *)t_thrd.proc->links.next;
+        } else if (StreamThreadAmI()) {
+            g_instance.proc_base->streamWorkerFreeProcs = (PGPROC *)t_thrd.proc->links.next;
         } else {
 #ifndef __USE_NUMA
             g_instance.proc_base->freeProcs = (PGPROC*)t_thrd.proc->links.next;
@@ -1217,6 +1230,72 @@ void PublishStartupProcessInformation(void)
 
 
 /*
+ * Check whether the left free Procs is larger than the required num.
+ */
+bool HaveNFreeStreamProcs(int procs_num)
+{
+    bool isEnough;
+
+    Assert(procs_num > 0);
+    Assert(g_instance.proc_base->freeStreamWorkerProcCount >= 0);
+
+    if (procs_num > g_instance.proc_base->freeStreamWorkerProcCount)
+        return false;
+
+    ProcBaseLockAccquire(&g_instance.proc_base_mutex_lock);
+
+    if (procs_num <= g_instance.proc_base->freeStreamWorkerProcCount) {
+        isEnough = true;
+    } else {
+        isEnough = false;
+    }
+
+    ProcBaseLockRelease(&g_instance.proc_base_mutex_lock);
+
+    return isEnough;
+}
+
+/*
+ * Own free stream process, if there are enough free stream process
+ * if own procs success, return true. else for false.
+ */
+bool OwnStreamProcsIfEnough(int32 procs_num)
+{
+    bool isEnough;
+
+    Assert(procs_num > 0);
+
+    if (procs_num > g_instance.proc_base->freeStreamWorkerProcCount)
+        return false;
+
+    ProcBaseLockAccquire(&g_instance.proc_base_mutex_lock);
+
+    if (procs_num <= g_instance.proc_base->freeStreamWorkerProcCount) {
+        g_instance.proc_base->freeStreamWorkerProcCount -= procs_num;
+        Assert(g_instance.proc_base->freeStreamWorkerProcCount >= 0);
+        isEnough = true;
+    } else {
+        isEnough = false;
+    }
+
+    ProcBaseLockRelease(&g_instance.proc_base_mutex_lock);
+
+    return isEnough;
+}
+
+void ForgetOwnedStreamProcs(int32 procs_num)
+{
+    Assert(procs_num > 0);
+
+    ProcBaseLockAccquire(&g_instance.proc_base_mutex_lock);
+
+    g_instance.proc_base->freeStreamWorkerProcCount += procs_num;
+    Assert(g_instance.proc_base->freeStreamWorkerProcCount <= g_instance.attr.attr_network.MaxStreamWorkers);
+
+    ProcBaseLockRelease(&g_instance.proc_base_mutex_lock);
+}
+
+/*
  * Check whether there are at least N free PGPROC objects.
  *
  * Note: this is designed on the assumption that N will generally be small.
@@ -1373,6 +1452,9 @@ static void ProcPutBackToFreeList()
     } else if (IsBgWorkerProcess()) {
         t_thrd.proc->links.next = (SHM_QUEUE*)g_instance.proc_base->bgworkerFreeProcs;
         g_instance.proc_base->bgworkerFreeProcs = t_thrd.proc;		
+    } else if (StreamThreadAmI()) {
+        t_thrd.proc->links.next = (SHM_QUEUE*)g_instance.proc_base->streamWorkerFreeProcs;
+        g_instance.proc_base->streamWorkerFreeProcs = t_thrd.proc;
     } else {
         t_thrd.proc->links.next = (SHM_QUEUE*)g_instance.proc_base->freeProcs;
         g_instance.proc_base->freeProcs = t_thrd.proc;

@@ -368,6 +368,10 @@ typedef struct PROC_HDR {
     uint32 allProcCount;
     /* Length of all non-prepared Procs */
     uint32		allNonPreparedProcCount;
+    /* Length of free stream Procs */
+    int32		freeStreamWorkerProcCount;
+    /* Head of list of free Stream PGPROC structures */
+    PGPROC* streamWorkerFreeProcs;
     /* Head of list of free PGPROC structures */
     PGPROC* freeProcs;
     /* Head of list of external's free PGPROC structures */
@@ -501,6 +505,9 @@ extern void ProcBaseLockRelease(pthread_mutex_t *procBaseLock);
 extern int GetAuxProcEntryIndex(int baseIdx);
 extern void PublishStartupProcessInformation(void);
 
+extern bool HaveNFreeStreamProcs(uint32 procs_num);
+extern bool OwnStreamProcsIfEnough(uint32 procs_num);
+extern void ForgetOwnedStreamProcs(int32 procs_num);
 extern bool HaveNFreeProcs(int n);
 extern void ProcReleaseLocks(bool isCommit);
 extern int GetUsedConnectionCount(void);

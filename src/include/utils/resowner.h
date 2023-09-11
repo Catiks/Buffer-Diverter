@@ -71,6 +71,10 @@ extern const char * ResourceOwnerGetName(ResourceOwner owner);
 extern MemoryContext ResourceOwnerGetMemCxt(ResourceOwner owner);
 extern void ResourceOwnerNewParent(ResourceOwner owner, ResourceOwner newparent);
 
+/* support for stream thread management */
+extern void ResourceOwnerRememberStreamThread(ResourceOwner owner, int numthread);
+extern void ResourceOwnerForgetStreamThread(ResourceOwner owner, int numthread);
+
 /* support for buffer refcount management */
 extern void ResourceOwnerEnlargeBuffers(ResourceOwner owner);
 extern void ResourceOwnerRememberBuffer(ResourceOwner owner, Buffer buffer);
@@ -197,6 +201,7 @@ extern void ResourceOwnerEnlargeGlobalIsExclusive(ResourceOwner owner);
 extern void ResourceOwnerRememberGlobalIsExclusive(ResourceOwner owner, volatile uint32 *isexclusive);
 extern void ResourceOwnerForgetGlobalIsExclusive(ResourceOwner owner, volatile uint32 *isexclusive);
 
+extern void ResourceOwnerReleaseStreamThread(ResourceOwner owner);
 extern void ResourceOwnerReleasePthreadMutex(ResourceOwner owner, bool isCommit);
 extern void ResourceOwnerReleaseRWLock(ResourceOwner owner, bool isCommit);
 extern void ResourceOwnerReleaseLocalCatCTup(ResourceOwner owner, bool isCommit);

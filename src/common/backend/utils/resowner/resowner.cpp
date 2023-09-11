@@ -49,6 +49,8 @@ typedef struct ResourceOwnerData {
     ResourceOwner nextchild;  /* next child of same parent */
     const char* name;         /* name (just for debugging) */
 
+    int nstreamthreads;    /* number of owned stream threads */
+
     /* We have built-in support for remembering owned buffers */
     int nbuffers;    /* number of owned buffer pins */
     Buffer* buffers; /* dynamically allocated array */
@@ -850,6 +852,17 @@ void ResourceOwnerEnlargeMetaCacheSlot(ResourceOwner owner)
 }
 
 /*
+ * Remember that n stream threads are owned by a ResourceOwner
+ */
+FORCE_INLINE
+void ResourceOwnerRememberStreamThread(ResourceOwner owner, int numthread)
+{
+    if (owner != NULL) {
+        owner->nstreamthreads += numthread;
+    }
+}
+
+/*
  * Remember that a buffer pin is owned by a ResourceOwner
  *
  * Caller must have previously done ResourceOwnerEnlargeBuffers()
@@ -958,6 +971,19 @@ void ResourceOwnerForgetMetaCacheSlot(ResourceOwner owner, CacheSlotId_t slotid)
         ereport(ERROR,
             (errcode(ERRCODE_WARNING_PRIVILEGE_NOT_GRANTED),
                 errmsg("meta cache block %d is not owned by resource owner %s", slotid, owner->name)));
+    }
+}
+
+/*
+ * Forget that n stream threads are owned by a ResourceOwner
+ */
+FORCE_INLINE
+void ResourceOwnerForgetStreamThread(ResourceOwner owner, int numthread)
+{
+    if (owner != NULL) {
+        owner->nstreamthreads -= numthread;
+
+        Assert(owner->nstreamthreads >= 0);
     }
 }
 
@@ -2239,6 +2265,30 @@ void ResourceOwnerForgetGlobalBaseEntry(ResourceOwner owner, GlobalBaseEntry* en
     ereport(ERROR,
         (errcode(ERRCODE_WARNING_PRIVILEGE_NOT_GRANTED),
             errmsg("the global base entry is not owned by resource owner %s", owner->name)));
+}
+
+void ResourceOwnerReleaseStreamThread(ResourceOwner owner)
+{
+    Assert(owner != NULL);
+    Assert(owner->nstreamthreads >= 0);
+
+    /* owned zero, do nothing. */
+    if (owner->nstreamthreads == 0)
+        return;
+
+    /* something wrong, just in case. */
+    if (owner->nstreamthreads < 0)
+    {
+        elog(WARNING, "Wrong owner nstreamthreads: %d", owner->nstreamthreads);
+        owner->nstreamthreads = 0;
+        return;
+    }
+
+    /* release stream threads and reset counter, if owned. */
+    if (owner->nstreamthreads > 0) {
+        ForgetOwnedStreamProcs(owner->nstreamthreads);
+        owner->nstreamthreads = 0;
+    }
 }
 
 void ResourceOwnerReleasePthreadMutex(ResourceOwner owner, bool isCommit)
