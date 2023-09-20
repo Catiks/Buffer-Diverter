@@ -339,9 +339,6 @@ public:
     /* Set the node status. */
     void setNodeStatus(int groupIdx, StreamObjStatus status);
 
-    /* Wait all thread in the node group to quit. */
-    void quitSyncPoint();
-
     /* Push a stream pair. */
     StreamPair* pushStreamPair(StreamKey key, List* producer, List* consumer);
 
@@ -466,17 +463,11 @@ private:
     /* Stream Pair list. */
     List* m_streamPairList;
 
-    /* A counter that't signal the stream thread group can destroy. */
-    volatile int m_quitWaitCond;
-
     /* A counter remeber the already created thread number. */
     volatile int m_createThreadNum;
 
-    /* A flag to indicate stream enter the quit point. */
-    volatile int m_streamEnter;
-
-    /* A counter to indicate stream enter the quit point. */
-    volatile int m_streamEnterCount;
+    /* A counter remeber the already quit thread number. */
+    volatile int m_quitThreadCount;
 
     /* Mutex and condition waiting for all thread in the node group is complete. */
     pthread_mutex_t m_mutex;
