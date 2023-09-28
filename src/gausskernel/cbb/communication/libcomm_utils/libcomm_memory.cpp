@@ -237,6 +237,7 @@ void gs_memory_send(
             for (; loc->pointer < loc->size; loc->pointer++) {
                 subContext->sharedBatches->CopyNth(batchsrc, loc->locator[loc->pointer]);
                 if (BatchMaxSize == subContext->sharedBatches->m_rows) {
+                    loc->pointer++;
                     ready_to_send = true;
                     break;
                 }
