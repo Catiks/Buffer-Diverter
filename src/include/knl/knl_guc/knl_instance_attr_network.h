@@ -48,6 +48,7 @@ typedef struct knl_instance_attr_network {
     bool PoolerStatelessReuse;
     bool comm_tcp_mode;
     int MaxConnections;
+    int MaxStreamWorkers;
     int maxInnerToolConnections;
     int ReservedBackends;
     int PostPortNumber;
