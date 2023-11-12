@@ -15,6 +15,7 @@
 
 inline static uint8 prefixToCopy(uint64 mask);
 inline static uint8 suffixToCopy(uint64 mask);
+inline bool VarLenTypeCheck(int typeId);
 
 /* Explicit template instantiations - to avoid code bloat in headers */
 template class ColumnVector<int8>;
@@ -39,13 +40,19 @@ template class ColumnVectorConst<uint8*>;
 /* ColumnVector */
 
 template <typename T>
-void ColumnVector<T>::Init() {
+void ColumnVector<T>::Init(bool setzero) {
     Assert(_bitmap == NULL);
     Assert(_data == NULL);
     _len = 0;
     _nulllen = 0;
-    _bitmap = (uint8*)MemoryContextAlloc(_cxt, sizeof(uint8) * ColumnVectorSize);
-    _data = (T*)MemoryContextAlloc(_cxt, sizeof(T) * ColumnVectorSize);
+    if (setzero) {
+        _bitmap = (uint8*)MemoryContextAllocZero(_cxt, sizeof(uint8) * ColumnVectorSize);
+        _data = (T*)MemoryContextAllocZero(_cxt, sizeof(T) * ColumnVectorSize);
+    }
+    else {
+        _bitmap = (uint8*)MemoryContextAlloc(_cxt, sizeof(uint8) * ColumnVectorSize);
+        _data = (T*)MemoryContextAlloc(_cxt, sizeof(T) * ColumnVectorSize);
+    }
 }
 
 template <typename T>
@@ -270,13 +277,73 @@ leftpack:
 }
 
 template <typename T>
+void ColumnVector<T>::FilterCopy(CVector* src, VecQualResult* QualResult) {
+    ColumnVector<T>* vsrc = static_cast<ColumnVector<T>*>(src);
+    T* dsrc = reinterpret_cast<T*>(vsrc->Data());
+    uint32 index;
+    int32 pos = 0, datapos;
+    uint64 mask;
+
+    for (uint32 i = 0;i < QualResult->count; ++i) {
+        const uint8_t prefix_to_copy = prefixToCopy(QualResult->masks[i]);
+        if (0xFF != prefix_to_copy) {
+            datapos = pos * sizeof(T);
+            memcpy(_data + datapos, dsrc + datapos, prefix_to_copy * sizeof(T));
+        }
+        else {
+            const uint8_t suffix_to_copy = suffixToCopy(QualResult->masks[i]);
+            if (0xFF != suffix_to_copy) {
+                datapos = (pos + FilterCalcSize - suffix_to_copy) * sizeof(T);
+                memcpy(_data + datapos, dsrc + datapos, suffix_to_copy * sizeof(T));
+            }
+            else {
+                mask = QualResult->masks[i];
+                while (mask) {
+                    index = pos + __builtin_ctzll(mask);
+                    _data[index] = dsrc[index];
+                    mask = blsr(mask);
+                }
+            }
+        }
+        pos += FilterCalcSize;
+    }
+
+    if (unlikely(QualResult->left_count)) {
+        mask = QualResult->masks[QualResult->count];
+        while (mask) {
+            index = pos + __builtin_ctzll(mask);
+            _data[index] = dsrc[index];
+            mask = blsr(mask);
+        }
+    }
+
+    return;
+}
+
+template <typename T>
 bool ColumnVector<T>::AtSame(int idx, void* value, uint32 size) {
     return *(T*)value == _data[idx];
 }
 
 template <typename T>
+void ColumnVector<T>::Clear() {
+    if (_nulllen) {
+        memset(_bitmap, 0, sizeof(uint8) * ColumnVectorSize);
+        _nulllen = 0;
+    }
+    memset(_data, 0, sizeof(T) * ColumnVectorSize);
+    _len = 0;
+}
+
+template <typename T>
 Datum ColumnVector<T>::At(int32 idx) { 
     return static_cast<Datum>(_data[idx]);
+}
+
+template <typename T>
+void ColumnVector<T>::SetIsVarLenType(Oid typeId)
+{
+    _is_varlen_type = VarLenTypeCheck(typeId);
 }
 
 template<> 
@@ -336,6 +403,29 @@ uint32 ColumnVector<uint8>::GetFilterRowsSaveResult(VecQualResult* result)
     return result->rows;
 }
 
+template <>
+uint32 ColumnVector<uint8>::GetNoFilterRowsSaveResult(VecQualResult* result) 
+{
+    uint32 i;
+	result->count = _len / FilterCalcSize;
+	result->left_count = _len & (FilterCalcSize - 1);
+    result->rows = 0;
+
+    for (i = 0; i < result->count; ++i) {
+        result->masks[i] = ~bytes64MaskToBits64Mask(_data + i * FilterCalcSize);
+        result->rows += __builtin_popcountll(result->masks[i]);
+    }
+
+    if (unlikely(result->left_count)) {
+        uint8* left_saddr = _data + (FilterCalcSize * (result->count));
+        memset(left_saddr + result->left_count, 1, FilterCalcSize - (result->left_count));
+        result->masks[i] = ~bytes64MaskToBits64Mask(left_saddr);
+        result->rows += __builtin_popcountll(result->masks[i]);   
+    }
+
+    return result->rows;
+}
+
 void ColumnVectorUint8And(ColumnVectorUint8* leftarg, ColumnVectorUint8* rightarg, ColumnVectorUint8* result) 
 {
     uint32 len = result->Size();
@@ -364,16 +454,33 @@ void ColumnVectorUint8Or(ColumnVectorUint8* leftarg, ColumnVectorUint8* rightarg
     }
 }
 
+void ColumnVectorUint8Not(ColumnVectorUint8* arg, ColumnVectorUint8* result) 
+{
+    uint32 len = result->Size();
+    uint8* a = reinterpret_cast<uint8*>(arg->Data());
+    uint8* b = reinterpret_cast<uint8*>(result->Data());
+
+    for (uint32 i = 0; i < len; ++i) { 
+        b[i] = !a[i];
+    }
+}
+
 /* ColumnVectorFixLen */
 
 template <uint32 unit>
-void ColumnVectorFixLen<unit>::Init() {
+void ColumnVectorFixLen<unit>::Init(bool setzero) {
     Assert(_bitmap == NULL);
     Assert(_data == NULL);
     _len = 0;
     _nulllen = 0;
-    _bitmap = (uint8*)MemoryContextAlloc(_cxt, sizeof(uint8) * ColumnVectorSize);
-    _data = (uint8*)MemoryContextAlloc(_cxt, unit * ColumnVectorSize);
+    if (setzero) {
+        _bitmap = (uint8*)MemoryContextAllocZero(_cxt, sizeof(uint8) * ColumnVectorSize);
+        _data = (uint8*)MemoryContextAllocZero(_cxt, unit * ColumnVectorSize);
+    }
+    else {
+        _bitmap = (uint8*)MemoryContextAlloc(_cxt, sizeof(uint8) * ColumnVectorSize);
+        _data = (uint8*)MemoryContextAlloc(_cxt, unit * ColumnVectorSize);
+    }
 }
 
 template <uint32 unit>
@@ -575,20 +682,83 @@ leftpack:
 }
 
 template <uint32 unit>
+void ColumnVectorFixLen<unit>::FilterCopy(CVector* src, VecQualResult* QualResult) {
+    ColumnVectorFixLen<unit>* vsrc = static_cast<ColumnVectorFixLen<unit>*>(src);
+    uint8* dsrc = reinterpret_cast<uint8*>(vsrc->Data());
+    uint32 index;
+    int32 pos = 0, datapos;
+    uint64 mask;
+
+    for (uint32 i = 0;i < QualResult->count; ++i) {
+        const uint8_t prefix_to_copy = prefixToCopy(QualResult->masks[i]);
+        if (0xFF != prefix_to_copy) {
+            datapos = pos * unit;
+            memcpy(_data + datapos, dsrc + datapos, prefix_to_copy * unit);
+        }
+        else {
+            const uint8_t suffix_to_copy = suffixToCopy(QualResult->masks[i]);
+            if (0xFF != suffix_to_copy) {
+                datapos = (pos + FilterCalcSize - suffix_to_copy) * unit;
+                memcpy(_data + datapos, dsrc + datapos, suffix_to_copy * unit);
+            }
+            else {
+                mask = QualResult->masks[i];
+                while (mask) {
+                    index = pos + __builtin_ctzll(mask);
+                    datapos = index * unit;
+                    memcpy(_data + datapos, dsrc + datapos, unit);
+                    mask = blsr(mask);
+                }
+            }
+        }
+        pos += FilterCalcSize;
+    }
+
+    if (unlikely(QualResult->left_count)) {
+        mask = QualResult->masks[QualResult->count];
+        while (mask) {
+            index = pos + __builtin_ctzll(mask);
+            datapos = index * unit;
+            memcpy(_data + datapos, dsrc + datapos, unit);
+            mask = blsr(mask);
+        }
+    }
+
+    return;
+}
+
+template <uint32 unit>
 bool ColumnVectorFixLen<unit>::AtSame(int idx, void* value, uint32 size) {
     return !memcmp(this->AtInternal(idx), value, unit);
 }
 
+template <uint32 unit>
+void ColumnVectorFixLen<unit>::Clear() {
+    if (_nulllen) {
+        memset(_bitmap, 0, sizeof(uint8) * ColumnVectorSize);
+        _nulllen = 0;
+    }
+    memset(_data, 0, unit * ColumnVectorSize);
+    _len = 0;
+}
+
 /* ColumnVectorStr */
 
-void ColumnVectorStr::Init() {
+void ColumnVectorStr::Init(bool setzero) {
     Assert(_bitmap == NULL);
     Assert(_offset == NULL);
     _len = 0;
     _nulllen = 0;
-    _bitmap = (uint8*)MemoryContextAlloc(_cxt, sizeof(uint8) * ColumnVectorSize);
-    _data.Alloc(_cxt, ColumnVectorStrDefaultSize);
-    _offset = (uint32*)CacheLineAlign(MemoryContextAlloc(_cxt, sizeof(uint32) * (ColumnVectorSize + 1) + CacheLineSize));
+    if (setzero) {
+        _bitmap = (uint8*)MemoryContextAllocZero(_cxt, sizeof(uint8) * ColumnVectorSize);
+        _data.Alloc(_cxt, ColumnVectorStrDefaultSize, true);
+        _offset = (uint32*)CacheLineAlign(MemoryContextAllocZero(_cxt, sizeof(uint32) * (ColumnVectorSize + 1) + CacheLineSize));
+    }
+    else {
+        _bitmap = (uint8*)MemoryContextAlloc(_cxt, sizeof(uint8) * ColumnVectorSize);
+        _data.Alloc(_cxt, ColumnVectorStrDefaultSize, false);
+        _offset = (uint32*)CacheLineAlign(MemoryContextAlloc(_cxt, sizeof(uint32) * (ColumnVectorSize + 1) + CacheLineSize));
+    }
     _offset[0] = 0;
     _offset += 1;
 }
@@ -853,6 +1023,16 @@ bool ColumnVectorStr::AtSame(int idx, void* value, uint32 size) {
     return !memcmp(this->AtInternal(idx), value, len);
 }
 
+void ColumnVectorStr::Clear() {
+    if (_nulllen) {
+        memset(_bitmap, 0, sizeof(uint8) * ColumnVectorSize);
+        _nulllen = 0;
+    }
+    _data.Clear();
+    memset(_offset, 0, sizeof(uint32) * ColumnVectorSize);
+    _len = 0;
+}
+
 /* ColumnVectorConst */
 
 template <typename T>
@@ -897,6 +1077,23 @@ void ColumnVectorConst<T>::DeepCopy(CVector* vector) {
     _len = v->_len;
     _data = v->_data;
 }
+template <typename T>
+void ColumnVectorConst<T>::SetIsVarLenType(Oid typeId)
+{
+    _is_varlen_type = VarLenTypeCheck(typeId);
+}
+
+template <typename T>
+void ColumnVectorConst<T>::Clear() {
+    _data = 0;
+    return;
+}
+
+template <>
+void ColumnVectorConst<uint8*>::Clear() {
+    memset(_data, 0, _size);
+    return;
+}
 
 /* BatchVector */
 
@@ -926,12 +1123,16 @@ BatchVector::BatchVector(MemoryContext cxt, TupleDesc desc, Bitmapset* AssignCol
                     alloc_size += sizeof(ColumnVectorInt64);
                     break;
                 case FLOAT4OID:
-                case FLOAT4ARRAYOID:
                     alloc_size += sizeof(ColumnVectorFloat4);
                     break;
+                case FLOAT4ARRAYOID:
+                    alloc_size += sizeof(ColumnVectorFloat4Array);
+                    break;
                 case FLOAT8OID:
-                case FLOAT8ARRAYOID:
                     alloc_size += sizeof(ColumnVectorFloat8);
+                    break;
+                case FLOAT8ARRAYOID:
+                    alloc_size += sizeof(ColumnVectorFloat8Array);
                     break;
                 case TEXTOID:
                 case BPCHAROID:
@@ -1000,14 +1201,20 @@ BatchVector::BatchVector(MemoryContext cxt, TupleDesc desc, Bitmapset* AssignCol
                 saddr += sizeof(ColumnVectorInt64);
                 break;
             case FLOAT4OID:
-            case FLOAT4ARRAYOID:
                 _vectors[i] = new(saddr) ColumnVectorFloat4(cxt);
                 saddr += sizeof(ColumnVectorFloat4);
                 break;
+            case FLOAT4ARRAYOID:
+                _vectors[i] = new(saddr) ColumnVectorFloat4Array(cxt);
+                saddr += sizeof(ColumnVectorFloat4Array);
+                break;
             case FLOAT8OID:
-            case FLOAT8ARRAYOID:
                 _vectors[i] = new(saddr) ColumnVectorFloat8(cxt);
                 saddr += sizeof(ColumnVectorFloat8);
+                break;
+            case FLOAT8ARRAYOID:
+                _vectors[i] = new(saddr) ColumnVectorFloat8Array(cxt);
+                saddr += sizeof(ColumnVectorFloat8Array);
                 break;
             case TEXTOID:
             case BPCHAROID:
@@ -1062,11 +1269,13 @@ CVector* AllocColumnVectorByType(MemoryContext cxt, int typeId)
         case TIDOID:
             return (CVector*)New(cxt) ColumnVectorInt64(cxt);
         case FLOAT4OID:
-        case FLOAT4ARRAYOID:
             return (CVector*)New(cxt) ColumnVectorFloat4(cxt);
+        case FLOAT4ARRAYOID:
+            return (CVector*)New(cxt) ColumnVectorFloat4Array(cxt);
         case FLOAT8OID:
-        case FLOAT8ARRAYOID:
             return (CVector*)New(cxt) ColumnVectorFloat8(cxt);
+        case FLOAT8ARRAYOID:
+            return (CVector*)New(cxt) ColumnVectorFloat8Array(cxt);
         case TEXTOID:
         case BPCHAROID:
         case VARCHAROID:
@@ -1104,6 +1313,7 @@ CVector* CreateColumnVectorConst(MemoryContext cxt, Const *con)
             vector->InitByValue(&con->constvalue, ColumnVectorSize);
             return vector;
         }
+        case DATEOID:
         case INT4OID: {
             ColumnVectorConstInt32* vector = (ColumnVectorConstInt32*)New(cxt) ColumnVectorConstInt32(cxt);
             vector->InitByValue(&con->constvalue, ColumnVectorSize);
@@ -1126,9 +1336,9 @@ CVector* CreateColumnVectorConst(MemoryContext cxt, Const *con)
             vector->InitByValue(&con->constvalue, ColumnVectorSize);
             return vector;
         }
-        case TEXTOID: 
+        case TEXTOID:
         case BPCHAROID:
-        case VARCHAROID: { 
+        case VARCHAROID: {
             ColumnVectorConstStr* vector = (ColumnVectorConstStr*)New(cxt) ColumnVectorConstStr(cxt);
             vector->InitByValue(VARDATA_ANY(con->constvalue), ColumnVectorSize, VARSIZE_ANY(con->constvalue) - VARHDRSZ);
             return vector;
@@ -1139,6 +1349,20 @@ CVector* CreateColumnVectorConst(MemoryContext cxt, Const *con)
     }
 
     return NULL;
+}
+
+bool ColumnVectorIsFixLen(int typeId) 
+{
+    switch (typeId) {
+        case TEXTOID:
+        case BPCHAROID:
+        case VARCHAROID:
+            return false;
+        default:
+            return true;
+    }
+
+    return false;
 }
 
 uint64 bytes64MaskToBits64Mask(const uint8 * bytes64)
@@ -1195,4 +1419,55 @@ inline static uint8 suffixToCopy(uint64 mask)
 {
     const auto prefix_to_copy = prefixToCopy(~mask);
     return prefix_to_copy >= FilterCalcSize ? prefix_to_copy : FilterCalcSize - prefix_to_copy;
+}
+
+inline bool VarLenTypeCheck(int typeId)
+{
+    // we search the sys table to find [0,8] attlen data type
+    // select typname,typlen from pg_type where typlen >= 0 and typlen <=8;
+    switch (typeId) {
+        case CHAROID:
+        case BOOLOID:
+        case INT2OID:
+        case INT8OID:
+        case INT1OID:
+        case INT4OID:
+        case FLOAT4OID:
+        case FLOAT8OID:
+        case CASHOID:
+        case DATEOID:
+        case TIMEOID:
+        case TIMESTAMPOID:
+        case TIMESTAMPTZOID:
+        case SMALLDATETIMEOID:
+        case OIDOID:
+        case TIDOID:
+        case CIDOID:
+        case ABSTIMEOID:
+        case RELTIMEOID:
+        case ANYOID:
+        case VOIDOID:
+        case TRIGGEROID:
+        case INTERNALOID:
+        case OPAQUEOID:
+        case ANYELEMENTOID:
+        case ANYNONARRAYOID:
+        case LANGUAGE_HANDLEROID:
+        case REGPROCOID:
+        case XIDOID:
+        case REGPROCEDUREOID:
+        case REGOPEROID:
+        case REGOPERATOROID:
+        case REGCLASSOID:
+        case REGTYPEOID:
+        case REGCONFIGOID:
+        case REGDICTIONARYOID:
+        case ANYENUMOID:
+        case FDW_HANDLEROID:
+        case HLL_HASHVAL_OID:
+        case SMGROID:
+            return false;
+        default:
+            return true;
+    }
 }
