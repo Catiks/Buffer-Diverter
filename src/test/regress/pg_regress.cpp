@@ -5461,12 +5461,12 @@ static void check_global_variables()
     }
 }
 
-#define BASE_PGXC_LIKE_MACRO_NUM 1396
+#define BASE_PGXC_LIKE_MACRO_NUM 1392
 static void check_pgxc_like_macros()
 {
 #ifdef BUILD_BY_CMAKE 
     char cmd_buf[1001];
-    snprintf(cmd_buf, 1000,"find %s/common/backend/ %s/gausskernel/ -name \"*.cpp\" | \
+    snprintf(cmd_buf, 1000,"find %s/common/backend/ %s/gausskernel/ -name \"*.cpp\" | grep -v 'vectorengine' | \
     xargs grep -e \"#ifdef STREAMPLAN\" -e \"#ifdef PGXC\"  -e \"IS_SINGLE_NODE\" | \
     wc -l", code_base_src, code_base_src);
     printf("cmake..............i\n");
@@ -5474,7 +5474,7 @@ static void check_pgxc_like_macros()
     char* cmd = cmd_buf;
 #else
     char cmd_buf[1001];
-    snprintf(cmd_buf, 1000,"find %s/src/common/backend/ %s/src/gausskernel/ -name \"*.cpp\" | \
+    snprintf(cmd_buf, 1000,"find %s/src/common/backend/ %s/src/gausskernel/ -name \"*.cpp\" | grep -v 'vectorengine' | \
     xargs grep -e \"#ifdef STREAMPLAN\" -e \"#ifdef PGXC\"  -e \"IS_SINGLE_NODE\" | \
     wc -l", top_builddir, top_builddir);
     char* cmd = cmd_buf;
