@@ -18,11 +18,14 @@
 #include "vecexecutor/vecfunc.h"
 #include "vecexecutor/vecnodes.h"
 #include "executor/node/nodeAgg.h"
+#include "windowapi.h"
 
 static void ExecReadyVecExpr(VecExprState *state);
-static void ExecInitVecExprRec(Expr *node, VecExprState *state, CVector **resv);
+static void ExecInitVecExprRec(Expr *node, VecExprState *state, CVector **resv, Expr *parent = NULL);
 static void VecExprEvalPushStep(VecExprState *es, const VecExprEvalStep *s);
 static void ExecInitVecFunc(VecExprEvalStep *scratch, Expr *node, List *args,
+			 Oid funcid, Oid inputcollid, VecExprState *state);
+static void ExecInitScalarArrayOp(VecExprEvalStep *scratch, Expr *node, List *args,
 			 Oid funcid, Oid inputcollid, VecExprState *state);
 
 VecExprState* ExecInitVectorExpr(Expr *node, PlanState *parent)
@@ -36,8 +39,7 @@ VecExprState* ExecInitVectorExpr(Expr *node, PlanState *parent)
 	state = makeNode(VecExprState);
 	state->expr = node;
 	state->parent = parent;
-	state->resultvector = New(CurrentMemoryContext) ColumnVectorUint8(CurrentMemoryContext);
-	state->filter_rows = 0;
+	state->resultvector = NULL;
 
 	ExecInitVecExprRec(node, state, &state->resultvector);
 
@@ -69,7 +71,7 @@ static void ExecReadyVecExpr(VecExprState *state)
 	ExecReadyInterpretedVecExpr(state);
 }
 
-static void ExecInitVecExprRec(Expr *node, VecExprState *state, CVector **resv)
+static void ExecInitVecExprRec(Expr *node, VecExprState *state, CVector **resv, Expr *parent)
 {
     VecExprEvalStep scratch;
 
@@ -108,13 +110,22 @@ static void ExecInitVecExprRec(Expr *node, VecExprState *state, CVector **resv)
         case T_Const:
 			{
 				Const *con = (Const *) node;
-
+				
 				/* must be create const vector */
 				Assert(*resv == NULL);
 				
-				CVector* resultvector = CreateColumnVectorConst(CurrentMemoryContext, con);
+				CVector* resultvector = AllocColumnVectorByType(CurrentMemoryContext, con->consttype);
+				resultvector->Init();
+				
+				if (con->constbyval) {
+					resultvector->InitByValue(&con->constvalue, ColumnVectorSize);
+				}
+				else {
+					resultvector->InitByValue(VARDATA_ANY(con->constvalue), 
+						ColumnVectorSize, VARSIZE_ANY(con->constvalue) - VARHDRSZ);
+				}
                 *resv = resultvector;
-				break;			
+				break;				
 			}
         case T_FuncExpr:
 			{
@@ -142,6 +153,37 @@ static void ExecInitVecExprRec(Expr *node, VecExprState *state, CVector **resv)
 
 				scratch.opcode = EEOP_VEC_FUNCEXPR;
 				VecExprEvalPushStep(state, &scratch);
+				break;
+			}
+		case T_Param:
+			{
+				Param *param = (Param *) node;			
+
+				switch (param->paramkind)
+				{
+					case PARAM_EXEC:
+						scratch.opcode = EEOP_VEC_PARAM_EXEC;
+						scratch.d.param.paramid = param->paramid;
+						scratch.d.param.paramtype = param->paramtype;
+						VecExprEvalPushStep(state, &scratch);
+						break;
+					case PARAM_EXTERN:
+						scratch.opcode = EEOP_VEC_PARAM_EXTERN;
+						scratch.d.param.paramid = param->paramid;
+						scratch.d.param.paramtype = param->paramtype;
+
+						if (parent && IsA(parent, FuncExpr) && 
+							expr_func_has_refcursor_args(((FuncExpr*)parent)->funcid))
+							scratch.d.param.is_cursor = true;
+						else
+							scratch.d.param.is_cursor = false;
+
+						VecExprEvalPushStep(state, &scratch);
+						break;
+					default:
+						elog(ERROR, "unrecognized paramkind: %d", (int) param->paramkind);
+						break;
+				}
 				break;
 			}
 		case T_Aggref:
@@ -174,18 +216,236 @@ static void ExecInitVecExprRec(Expr *node, VecExprState *state, CVector **resv)
 					/* planner messed up */
 					ereport(ERROR, (errcode(ERRCODE_UNEXPECTED_NODE_STATE), errmsg("Aggref found in non-Agg plan node")));
 				}
-		
+
+				CVector* resultvector = AllocColumnVectorByType(CurrentMemoryContext, aggref->aggtype);
+				*resv = resultvector;
 				scratch.d.aggref.astate = astate;
 				scratch.opcode = EEOP_VEC_AGGREF;
 				VecExprEvalPushStep(state, &scratch);
 				break;
 			} 
+
+		case T_WindowFunc:
+			{
+				WindowFunc* wfunc = (WindowFunc*)node;
+				WindowFuncExprState* wfstate = makeNode(WindowFuncExprState);
+				wfstate->wfunc = wfunc;
+				wfstate->xprstate.expr = node;
+				
+				if (state->parent && (IsA(state->parent, WindowAggState) || IsA(state->parent, VecWindowAggState))) {
+					VecWindowAggState* winstate = (VecWindowAggState*)state->parent;
+					int nfuncs;
+
+					winstate->funcs = lappend(winstate->funcs, wfstate);
+					nfuncs = ++winstate->numfuncs;
+					if (wfunc->winagg)
+						winstate->numaggs++;
+
+					wfstate->args = ExecInitVectorExprList(wfunc->args, state->parent);
+
+					/*
+					* Complain if the windowfunc's arguments contain any
+					* windowfuncs; nested window functions are semantically
+					* nonsensical.  (This should have been caught earlier,
+					* but we defend against it here anyway.)
+					*/
+					if (nfuncs != winstate->numfuncs)
+						ereport(
+							ERROR, (errcode(ERRCODE_WINDOWING_ERROR), errmsg("window function calls cannot be nested")));
+				} else {
+					/* planner messed up */
+					ereport(
+						ERROR, (errcode(ERRCODE_WINDOWING_ERROR), errmsg("WindowFunc found in non-WindowAgg plan node")));
+				}
+
+				CVector* resultvector = AllocColumnVectorByType(CurrentMemoryContext, wfunc->wintype);
+				*resv = resultvector;
+
+				scratch.opcode = EEOP_VEC_WINDOW_FUNC;
+				scratch.d.window_func.wfstate = wfstate;
+				VecExprEvalPushStep(state, &scratch);
+				break;
+			}
 		case T_RelabelType: 
 			{
 				RelabelType* relabel = (RelabelType*) node;
-				ExecInitVecExprRec(relabel->arg, state, resv);
+				ExecInitVecExprRec(relabel->arg, state, resv, node);
 				break;
 			}
+		case T_BoolExpr:
+			{
+				BoolExpr* boolexpr = (BoolExpr*)node;
+				int nargs = list_length(boolexpr->args);
+				List *adjust_jumps = NIL;
+				int off;
+				ListCell *lc;
+				ColumnVectorUint8* orresult;
+
+				orresult = New(CurrentMemoryContext) ColumnVectorUint8(CurrentMemoryContext);		
+				off = 0;
+				foreach(lc, boolexpr->args) {
+					Expr *node = (Expr *) lfirst(lc);
+					CVector** resultvector = (CVector**)palloc(sizeof(CVector**));
+					*resultvector = NULL;
+
+					ExecInitVecExprRec(node, state, resultvector);
+
+					switch (boolexpr->boolop)
+					{
+						case AND_EXPR:
+							Assert(nargs >= 2);
+
+							if (off == 0)
+								scratch.opcode = EEOP_VEC_BOOL_AND_STEP_FIRST;
+							else if (off + 1 == nargs)
+								scratch.opcode = EEOP_VEC_BOOL_AND_STEP_LAST;
+							else
+								scratch.opcode = EEOP_VEC_BOOL_AND_STEP;
+							break;
+						case OR_EXPR:
+							Assert(nargs >= 2);
+
+							if (off == 0)
+								scratch.opcode = EEOP_VEC_BOOL_OR_STEP_FIRST;
+							else if (off + 1 == nargs)
+								scratch.opcode = EEOP_VEC_BOOL_OR_STEP_LAST;
+							else
+								scratch.opcode = EEOP_VEC_BOOL_OR_STEP;
+							break;
+						default:
+							elog(ERROR, "unrecognized boolop: %d", (int) boolexpr->boolop);
+							break;
+					}
+
+					scratch.d.boolqual.jumpdone = -1;
+					scratch.d.boolqual.bool_result = orresult;
+					scratch.d.boolqual.expr_result = *resultvector;
+					VecExprEvalPushStep(state, &scratch);
+					adjust_jumps = lappend_int(adjust_jumps, state->steps_len - 1);
+					off++;
+				}
+
+				*scratch.resvector = orresult;
+				foreach(lc, adjust_jumps) {
+					VecExprEvalStep *as = &state->steps[lfirst_int(lc)];
+					Assert(as->d.boolqual.jumpdone == -1);
+					as->d.boolqual.jumpdone = state->steps_len;
+				}
+				break;
+			}
+		case T_CaseExpr:
+			{
+				CaseExpr *caseExpr = (CaseExpr*)node;
+				List *adjust_jumps = NIL;
+				ListCell *lc;
+				CVector* finalvector;
+				ColumnVectorUint8* finalresult;
+				bool is_first = true;
+				bool result_is_str;
+				uint32* count;
+
+				Assert(*resv == NULL);
+				result_is_str = !ColumnVectorIsFixLen(caseExpr->casetype);
+				finalvector = AllocColumnVectorByType(CurrentMemoryContext, caseExpr->casetype);
+				finalvector->Init();
+				*resv = finalvector;
+				
+				finalresult = New(CurrentMemoryContext) ColumnVectorUint8(CurrentMemoryContext);
+				count = (uint32*)palloc(sizeof(uint32));
+				*count = 0;
+
+				foreach(lc, caseExpr->args) {
+					CaseWhen *when = (CaseWhen*)lfirst(lc);
+					CVector** whenvector = (CVector**)palloc(sizeof(CVector*));
+					*whenvector = NULL;
+					CVector** thenvector = (CVector**)palloc(sizeof(CVector*));
+					*thenvector = NULL;
+					int	whenstep;
+					VecQualResult* qualresult = CreateQualResult();
+					ColumnVectorUint8* caseresult = New(CurrentMemoryContext) ColumnVectorUint8(CurrentMemoryContext);
+					caseresult->Init();
+
+					ExecInitVecExprRec(when->expr, state, whenvector);
+
+					if (is_first)
+						scratch.opcode = EEOP_VEC_CASEWHEN_WHEN_FIRST;
+					else
+						scratch.opcode = EEOP_VEC_CASEWHEN_WHEN;
+					scratch.d.casewhen.jumpnext = -1;
+					scratch.d.casewhen.jumpdone = -1;
+					scratch.d.casewhen.when_vector = *whenvector;
+					scratch.d.casewhen.qual_result = qualresult;
+					scratch.d.casewhen.case_result = caseresult;
+					scratch.d.casewhen.final_result = finalresult;
+					scratch.d.casewhen.count = count;
+					VecExprEvalPushStep(state, &scratch);
+					
+					whenstep = state->steps_len - 1;
+					is_first = false;
+
+					ExecInitVecExprRec(when->result, state, thenvector);
+
+					if (result_is_str)
+						scratch.opcode = EEOP_VEC_CASEWHEN_THEN_STR;
+					else
+						scratch.opcode = EEOP_VEC_CASEWHEN_THEN;
+					scratch.d.casewhen.jumpnext = -1;
+					scratch.d.casewhen.jumpdone = -1;
+					scratch.d.casewhen.qual_result = qualresult;
+					scratch.d.casewhen.case_vector.then_vector = *thenvector;
+					scratch.d.casewhen.final_vector = finalvector;
+					VecExprEvalPushStep(state, &scratch);
+
+					adjust_jumps = lappend_int(adjust_jumps, state->steps_len - 1);
+					state->steps[whenstep].d.casewhen.jumpnext = state->steps_len;
+				}
+
+				if (caseExpr->defresult) {
+					CVector** defaultvector = (CVector**)palloc(sizeof(CVector**));
+					*defaultvector = NULL;
+					VecQualResult* qualresult = CreateQualResult();
+
+					ExecInitVecExprRec(caseExpr->defresult, state, defaultvector);
+
+					if (result_is_str)
+						scratch.opcode = EEOP_VEC_CASEWHEN_DEFAULT_STR;
+					else
+						scratch.opcode = EEOP_VEC_CASEWHEN_DEFAULT;
+					scratch.d.casewhen.qual_result = qualresult;
+					scratch.d.casewhen.case_vector.default_vector = *defaultvector;
+					scratch.d.casewhen.final_result = finalresult;
+					scratch.d.casewhen.final_vector = finalvector;
+					scratch.d.casewhen.count = count;
+					VecExprEvalPushStep(state, &scratch);
+				}
+				else {
+					ereport(ERROR, (errcode(ERRCODE_FEATURE_NOT_SUPPORTED), errmodule(MOD_VEC_EXECUTOR), errmsg("null need supported!")));
+				}
+
+				foreach(lc, adjust_jumps) {
+					VecExprEvalStep *as = &state->steps[lfirst_int(lc)];
+					Assert(as->opcode == EEOP_VEC_CASEWHEN_THEN_STR || 
+						   as->opcode == EEOP_VEC_CASEWHEN_THEN);
+					Assert(as->d.casewhen.jumpdone == -1);
+					as->d.casewhen.jumpdone = state->steps_len;
+				}
+				break;
+			}
+		case T_ScalarArrayOpExpr:
+		{
+			ScalarArrayOpExpr* opexpr = (ScalarArrayOpExpr*)node;
+
+			/* result must be create by me, should uint8 filter */
+			Assert(*resv == NULL);
+			
+			ExecInitScalarArrayOp(
+				&scratch, node, opexpr->args, opexpr->opfuncid,  opexpr->inputcollid, state);
+					
+			scratch.opcode = EEOP_VEC_SCALARARRAYOP;
+			VecExprEvalPushStep(state, &scratch);
+			break;
+		}
+
 		default:
 			elog(ERROR, "unrecognized node type: %d, line=%d, func:%s",
 				 (int) nodeTag(node), __LINE__, __func__);	
@@ -209,7 +469,7 @@ void VecExprEvalPushStep(VecExprState *es, const VecExprEvalStep *s)
 	memcpy(&es->steps[es->steps_len++], s, sizeof(VecExprEvalStep));
 }
 
-static Oid search_typeid_from_funid(Oid funcid) {
+Oid search_typeid_from_funid(Oid funcid) {
 	Oid TypeId = InvalidOid;
 	switch (funcid) {
 		case 65:
@@ -218,6 +478,7 @@ static Oid search_typeid_from_funid(Oid funcid) {
 		case 147:
 		case 149:
 		case 150:
+		case 351:
 			TypeId = INT4OID;
 			break;
 		case 467:
@@ -232,6 +493,7 @@ static Oid search_typeid_from_funid(Oid funcid) {
 		case 477:
 		case 478:
 		case 479:
+		case 842:
 		case 852:
 		case 853:
 		case 854:
@@ -256,11 +518,27 @@ static Oid search_typeid_from_funid(Oid funcid) {
 		case 217:
 		case 218:
 		case 219:
+		case 355:
+		case 293:
+		case 294:
+		case 295:
+		case 296:
+		case 297:
+		case 298:
 			TypeId = FLOAT8OID;
 			break;
 		case 67:
 		case 850:
 			TypeId = TEXTOID;
+		case 360:
+			TypeId = VARCHAROID;
+			break;
+		case 1048:
+		case 1078:
+			TypeId = BPCHAROID;
+			break;
+		case 2045:
+			TypeId = TIMESTAMPOID;
 			break;
 		default:
 			ereport(ERROR, (errcode(ERRCODE_FEATURE_NOT_SUPPORTED), errmodule(MOD_VEC_EXECUTOR), 
@@ -274,37 +552,127 @@ static Oid search_typeid_from_funid(Oid funcid) {
 
 void FuncArgsDispatch(int FArgsId, int LArgsId, int RArgsId, int* idx) {
 	if (FArgsId == LArgsId) {
-		if (RArgsId == INT1OID)
-			*idx = 2;
-		else if (RArgsId == INT2OID)
-			*idx = 3;
-		else if (RArgsId == INT4OID)
-			*idx = 4;
-		else if (RArgsId == INT8OID)
-			*idx = 5;
-		else if (RArgsId == FLOAT4OID)
-			*idx = 5;
-		else if (RArgsId == FLOAT8OID)
-			*idx = 5;
-		else
-			*idx = -1;
+		switch (RArgsId) {
+			case INT1OID:
+				*idx = 2;
+				return;
+			case INT2OID:
+				*idx = 3;
+				return;
+			case INT4OID:
+			case DATEOID:
+			case FLOAT4OID:
+				*idx = 4;
+				return;
+			case INT8OID:
+			case TIMESTAMPOID:
+			case TIDOID:
+			case FLOAT8OID:
+			case TEXTOID: 
+			case VARCHAROID:
+			case BPCHAROID:
+				*idx = 5;
+				return;
+			default:
+				*idx = -1;
+				return;
+		}
 	}
 	else {
-		if (LArgsId == INT1OID)
-			*idx = 6;
-		else if (LArgsId == INT2OID)
-			*idx = 7;
-		else if (LArgsId == INT4OID)
-			*idx = 8;
-		else if (LArgsId == INT8OID)
-			*idx = 9;
-		else if (LArgsId == FLOAT4OID)
-			*idx = 9;
-		else if (LArgsId == FLOAT8OID)
-			*idx = 9;
-		else
-			*idx = -1;
+		switch (LArgsId) {
+			case INT1OID:
+				*idx = 6;
+				return;
+			case INT2OID:
+				*idx = 7;
+				return;
+			case INT4OID:
+			case DATEOID:
+			case FLOAT4OID:
+				*idx = 8;
+				return;
+			case INT8OID:
+			case TIMESTAMPOID:
+			case TIDOID:
+			case FLOAT8OID:
+			case TEXTOID: 
+			case VARCHAROID:
+			case BPCHAROID:
+				*idx = 9;
+				return;
+			default:
+				*idx = -1;
+				return;
+		}
 	}
+}
+
+static void ExecInitScalarArrayOp(VecExprEvalStep *scratch, Expr *node, List *args,
+			 Oid funcid, Oid inputcollid, VecExprState *state)
+{
+	AclResult	aclresult;
+	FmgrInfo   *finfo;
+	VecFunctionCallInfo fcinfo;
+	VectorFuncCacheEntry* entry = NULL;
+    bool found = false;
+	CVector* resvector;
+    Oid arg_type = InvalidOid;
+	int nargs;
+	int idx = 1; //const always on the right
+	Expr *scalararg;
+	Expr *arrayarg;
+
+	/* Check permission to call function */
+	aclresult = pg_proc_aclcheck(funcid, GetUserId(), ACL_EXECUTE);
+	if (aclresult != ACLCHECK_OK)
+		aclcheck_error(aclresult, ACL_KIND_PROC, get_func_name(funcid));
+
+	finfo = (FmgrInfo*)palloc0(sizeof(FmgrInfo));
+	fcinfo =(VecFunctionCallInfo) palloc0(sizeof(VecFunctionCallInfoData));
+
+	fmgr_info(funcid, finfo);
+	fmgr_info_set_expr((Node*)node, finfo);
+	InitVecFunctionCallInfoData(fcinfo, finfo, inputcollid);
+
+	nargs = list_length(args);
+	Assert(nargs == 2);
+
+	scalararg = (Expr*)linitial(args);
+	arrayarg = (Expr*)lsecond(args);
+
+	ExecInitVecExprRec(scalararg, state, &fcinfo->vec[0], node);
+	fcinfo->args[0] = fcinfo->vec[0]->DataAddr();
+	fcinfo->offset[0] = fcinfo->vec[0]->OffsetAddr();
+	fcinfo->null[0] = fcinfo->vec[0]->BitmapAddr();
+	arg_type = exprType((Node*)scalararg);
+
+	Oid funcrettype;
+	TupleDesc tupdesc;
+	get_expr_result_type((Node*)node, &funcrettype, &tupdesc);
+	resvector = AllocColumnVectorByType(CurrentMemoryContext, funcrettype);
+	resvector->Init(true);
+	fcinfo->args[2] = resvector->DataAddr();
+	fcinfo->vec[2] = resvector;
+
+    entry = (VectorFuncCacheEntry*)hash_search(g_instance.vector_func_hash, &funcid, HASH_FIND, &found);
+    if (found && entry && idx != -1 && entry->vec_fn_cache_append[idx]) {
+        scratch->d.scalararrayop.vec_fn_addr = entry->vec_fn_cache_append[idx];
+    }
+    else {
+		ereport(ERROR, (errcode(ERRCODE_FEATURE_NOT_SUPPORTED), errmodule(MOD_VEC_EXECUTOR), 
+			errmsg("UnSupported vector function id:%d, line=%d, func:%s", funcid, __LINE__, __func__)));
+    }
+
+	*scratch->resvector = resvector;
+	scratch->d.scalararrayop.fcinfo = fcinfo;
+	scratch->d.scalararrayop.finfo = finfo;
+	scratch->d.scalararrayop.nargs = nargs + 1;
+	if (ColumnVectorIsFixLen(arg_type))
+		scratch->d.scalararrayop.exec_scalararray_op = ExecVecFixlenScalarArrayOp;
+	else
+		scratch->d.scalararrayop.exec_scalararray_op = ExecVecStrScalarArrayOp;
+
+	scratch->d.scalararrayop.arr = (ArrayType*)(((Const*)arrayarg)->constvalue);
 }
 
 static void ExecInitVecFunc(VecExprEvalStep *scratch, Expr *node, List *args, Oid funcid,
@@ -318,9 +686,9 @@ static void ExecInitVecFunc(VecExprEvalStep *scratch, Expr *node, List *args, Oi
 	VectorFuncCacheEntry* entry = NULL;
     bool found = false;
 	CVector* resvector;
-	uint32 const_argno;
-    Oid arg_type[2] = {InvalidOid, InvalidOid};
-    Const* const_val[2] = {NULL, NULL};
+	uint32 const_argno[VECFUNC_ARGS];
+    Oid arg_type[VECFUNC_ARGS];
+    Const* const_val[VECFUNC_ARGS];
 	int const_num;
 	int nargs;
 	int idx = -1;
@@ -337,62 +705,81 @@ static void ExecInitVecFunc(VecExprEvalStep *scratch, Expr *node, List *args, Oi
 	fmgr_info_set_expr((Node*)node, finfo);
 	InitVecFunctionCallInfoData(fcinfo, finfo, inputcollid);
 	
+	memset(const_argno, 0, sizeof(uint32) * VECFUNC_ARGS);
+	memset(arg_type, 0, sizeof(Oid) * VECFUNC_ARGS);
+	memset(const_val, 0, sizeof(Const*) * VECFUNC_ARGS);
+
 	argno = 0;
 	const_num = 0;
 	nargs = list_length(args);
-	Assert(nargs <= 2);
-	if (nargs == 2) {
-		Assert(nargs == 2);
-
+	if (nargs > 1) {
 		foreach(lc, args) {
 			Expr *arg = (Expr *) lfirst(lc);
 
 			if (IsA(arg, Const)) {
 				Const *con = (Const*)arg;
-    	        const_argno = argno;
-    	        const_val[argno] = con;
+    	        const_argno[const_num] = argno;
+    	        const_val[const_num] = con;
 				const_num++;
 			}
 			else {
-    	    	ExecInitVecExprRec(arg, state, &fcinfo->vec[argno]);
+				arg_type[argno] = exprType((Node *)arg);
+    	    	ExecInitVecExprRec(arg, state, &fcinfo->vec[argno], node);
 				fcinfo->args[argno] = fcinfo->vec[argno]->DataAddr();
 				fcinfo->offset[argno] = fcinfo->vec[argno]->OffsetAddr();
-    	        arg_type[argno] = exprType((Node *)arg);
+				fcinfo->null[argno] = fcinfo->vec[argno]->BitmapAddr();
 			}
 			argno++;
 		}
 
-		if (const_num == 1) {
-			/* one var one const */
-			const_val[const_argno]->consttype = arg_type[(int)(!const_argno)];
-			fcinfo->vec[const_argno] = CreateColumnVectorConst(CurrentMemoryContext, const_val[const_argno]);
-			fcinfo->args[const_argno] = fcinfo->vec[const_argno]->DataAddr();
-			fcinfo->offset[const_argno] = fcinfo->vec[const_argno]->OffsetAddr();
-			idx = const_argno;
+		/* for include const OP function */
+		if (nargs == 2 && const_num == 1) {
+			// TODO:// when the type of const value is not a num type, we  dont trans it.
+			if (const_val[0]->consttype != TEXTOID) {
+				const_val[0]->consttype = arg_type[(int)(!const_argno[0])];
+			}
+			fcinfo->vec[const_argno[0]] = CreateColumnVectorConst(CurrentMemoryContext, const_val[0]);
+			fcinfo->args[const_argno[0]] = fcinfo->vec[const_argno[0]]->DataAddr();
+			fcinfo->offset[const_argno[0]] = fcinfo->vec[const_argno[0]]->OffsetAddr();
+			fcinfo->null[const_argno[0]] = fcinfo->vec[const_argno[0]]->BitmapAddr();
+			idx = const_argno[0];
 		}
-		else if (const_num == 0) {
-			/* two var */
+		/* for two var function */
+		else if (nargs == 2 && const_num == 0) {		
 			Oid TypeId = search_typeid_from_funid(funcid);
 			FuncArgsDispatch(TypeId, arg_type[0], arg_type[1], &idx);
 		}
+		/* for include const and var function */
+		else if (nargs != const_num && const_num) {
+			for (int i = 0; i < const_num; ++i) {
+				fcinfo->vec[const_argno[i]] = CreateColumnVectorConst(CurrentMemoryContext, const_val[i]);
+				fcinfo->args[const_argno[i]] = fcinfo->vec[const_argno[i]]->DataAddr();
+				fcinfo->offset[const_argno[i]] = fcinfo->vec[const_argno[i]]->OffsetAddr();
+				fcinfo->null[const_argno[i]] = fcinfo->vec[const_argno[i]]->BitmapAddr();
+			}
+			idx = 0;
+		}
 		else {
-			/* two const */
+			/* other number of const */
 			ereport(ERROR, (errcode(ERRCODE_FEATURE_NOT_SUPPORTED), errmodule(MOD_VEC_EXECUTOR), errmsg("need supported!")));
 		}
 	}
-	else {
-		Assert(nargs == 1);
-		Expr *arg = (Expr *) list_head(args);
+	else if (nargs == 1) {
+		Expr *arg = (Expr *)lfirst(list_head(args));
 
 		if (IsA(arg, Const))
 			fcinfo->vec[argno] = CreateColumnVectorConst(CurrentMemoryContext, (Const*)arg);
 		else
-    		ExecInitVecExprRec(arg, state, &fcinfo->vec[argno]);
+    		ExecInitVecExprRec(arg, state, &fcinfo->vec[argno], node);
 
 		fcinfo->args[argno] = fcinfo->vec[argno]->DataAddr();
 		fcinfo->offset[argno] = fcinfo->vec[argno]->OffsetAddr();
+		fcinfo->null[argno] = fcinfo->vec[argno]->OffsetAddr();
 		argno++;
 		idx = 0;
+	}
+	else {
+		ereport(ERROR, (errcode(ERRCODE_FEATURE_NOT_SUPPORTED), errmodule(MOD_VEC_EXECUTOR), errmsg("need supported!")));
 	}
 
 	Oid funcrettype;
@@ -435,7 +822,6 @@ VecExprState* ExecInitQualVectorExpr(List *qual, PlanState *parent)
 	state->expr = (Expr*)qual;
 	state->parent = parent;
 	state->resultvector = New(CurrentMemoryContext) ColumnVectorUint8(CurrentMemoryContext);
-	state->filter_rows = 0;
 
 	nquals = 0;
 	scratch.opcode = EEOP_VEC_QUAL;
@@ -512,7 +898,6 @@ VecExprState* ExecInitProjVectorExpr(List *targetList, TupleTableSlot* slot, Pla
 	state->expr = (Expr*)targetList;
 	state->parent = parent;
     state->resultbatch = New(CurrentMemoryContext) BatchVector(CurrentMemoryContext, slot->tts_tupleDescriptor);
-	state->filter_rows = 0;
 
     foreach (lc, targetList) {
 		TargetEntry *tle = lfirst_node(TargetEntry, lc);
@@ -640,8 +1025,13 @@ static void VecExecBuildAggTransCall(VecExprState *state, VecAggState *aggstate,
 			else
 				scratch->opcode = EEOP_VEC_AGG_PLAIN_TRANS_BYREF;
 		}
-
-    }
+    } 
+	else if (pertrans->numInputs == 1) {
+		scratch->opcode = EEOP_VEC_AGG_ORDERED_TRANS_DATUM;
+    } 
+	else {
+        scratch->opcode = EEOP_VEC_AGG_ORDERED_TRANS_TUPLE;
+	}
 
     scratch->d.agg_trans.pertrans = pertrans;
     scratch->d.agg_trans.setno = setno;
@@ -662,7 +1052,6 @@ VecExprState* ExecBuildVecAggTrans(VecAggState* aggstate, AggStatePerPhase phase
     state->expr = (Expr*)aggstate;
 	state->parent = &aggstate->ss.ps;
 	state->resultvector = NULL;
-	state->filter_rows = 0;
     aggstate->vecaggstate = state;
 
     for (transno = 0; transno < aggstate->numtrans; transno++) {
@@ -712,10 +1101,14 @@ VecExprState* ExecBuildVecAggTrans(VecAggState* aggstate, AggStatePerPhase phase
             /*
              * DISTINCT and/or ORDER BY case, with a single column sorted on.
              */
+
+			TargetEntry *source_tle = (TargetEntry *)linitial(pertrans->aggref->args);
+
+            Assert(list_length(pertrans->aggref->args) == 1);
+
+            ExecInitVecExprRec(source_tle->expr, state, &trans_fcinfo->vec[0]);
         } else {
-            /*
-             * DISTINCT and/or ORDER BY case, with multiple columns sorted on.
-             */
+			ereport(ERROR, (errcode(ERRCODE_FEATURE_NOT_SUPPORTED), errmodule(MOD_VEC_EXECUTOR), errmsg("need supported!")));
         }
 
         /*
@@ -727,6 +1120,9 @@ VecExprState* ExecBuildVecAggTrans(VecAggState* aggstate, AggStatePerPhase phase
         if (doSort) {
             int processGroupingSets = Max(phase->numsets, 1);
 
+			if (pertrans->numDistinctCols)
+				continue;
+				
             for (setno = 0; setno < processGroupingSets; setno++) {
                 VecExecBuildAggTransCall(state, aggstate, &scratch, isCollect ? collect_fcinfo : trans_fcinfo, pertrans,
                                       transno, setno, setoff, false, isCollect);
@@ -754,6 +1150,53 @@ VecExprState* ExecBuildVecAggTrans(VecAggState* aggstate, AggStatePerPhase phase
     scratch.opcode = EEOP_VEC_DONE;
     VecExprEvalPushStep(state, &scratch);
 	
+    ExecReadyVecExpr(state);
+
+    return state;
+}
+
+VecExprState* ExecBuildVecWinAgg(VecWindowAggState* winstate)
+{
+	VecExprState  *state;
+	VecExprEvalStep scratch;
+    int transno = 0;
+    WindowStatePerFunc per_func_state;
+	ListCell *l;
+	VecFunctionCallInfo trans_fcinfo;
+
+	state = makeNode(VecExprState);
+    state->expr = (Expr*)winstate;
+	state->parent = &winstate->ss.ps;
+	state->resultvector = NULL;
+    winstate->vec_evaltrans = state;
+
+    for (transno = 0; transno < winstate->numaggs; transno++) {
+        per_func_state = &(winstate->perfunc[transno]);
+        int argno;
+        trans_fcinfo = &(winstate->windowAggInfo[transno].vec_agg_function);
+
+        argno = 0;
+
+        foreach (l, per_func_state->wfunc->args) {
+            ExecInitVecExprRec((Expr *)lfirst(l), state, &trans_fcinfo->vec[0]);
+            argno++;
+        }
+
+        if (per_func_state->resulttypeByVal) {
+            scratch.opcode = EEOP_VEC_WINAGG_PLAIN_TRANS_BYVAL;
+        } else {
+            scratch.opcode = EEOP_VEC_WINAGG_PLAIN_TRANS_BYREF;
+        }
+
+        scratch.d.winagg_trans.perfunc = per_func_state;
+        scratch.d.winagg_trans.transno = transno;
+        scratch.d.winagg_trans.aggcontext = NULL;
+        scratch.d.winagg_trans.trans_fcinfo = trans_fcinfo;
+        VecExprEvalPushStep(state, &scratch);
+    }
+
+    scratch.opcode = EEOP_VEC_DONE;
+    VecExprEvalPushStep(state, &scratch);
     ExecReadyVecExpr(state);
 
     return state;
