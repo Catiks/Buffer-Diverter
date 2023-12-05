@@ -1825,6 +1825,10 @@ void StreamProducer::initSharedContext()
     /* Only init when we already create a shared context for local stream. */
     if (m_sharedContext == NULL)
         return;
+    /*
+     * alloc memory by the TopConsumer's MemoryContext
+     */
+    MemoryContext old = MemoryContextSwitchTo(m_sharedContext->localStreamMemoryCtx);
 
     if (m_sharedContext->vectorized) {
         /* Init batches. */
@@ -1845,6 +1849,7 @@ void StreamProducer::initSharedContext()
             }
         }
     }
+    MemoryContextSwitchTo(old);
     m_sharedContextInit = true;
 }
 

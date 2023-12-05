@@ -337,8 +337,7 @@ StreamNodeGroup::StreamNodeGroup()
     : m_size(0),
       m_streamNum(1),
       m_createThreadNum(0),
-      m_streamEnter(0),
-      m_streamEnterCount(0),
+      m_quitThreadCount(0),
       m_canceled(false),
       m_needClean(false),
       m_errorStop(false),
@@ -354,7 +353,6 @@ StreamNodeGroup::StreamNodeGroup()
     m_syncControllers = NIL;
     m_streamRuntimeContext = NULL;
     m_streamArray = NULL;
-    m_quitWaitCond = 0;
     m_edataWriteProtect = EDATA_WRITE_ENABLE;
     m_producerEdata = NULL;
 #ifndef ENABLE_MULTIPLE_NODES
@@ -379,7 +377,6 @@ void StreamNodeGroup::Init(int threadNum)
         m_streamArray[i].status = STREAM_UNDEFINED;
 
     /* all stream thead + top consumer thread. */
-    m_quitWaitCond = m_size;
 #ifdef ENABLE_MULTIPLE_NODES
     bool found = false;
     AutoMutexLock streamLock(&m_streamNodeGroupLock);
@@ -597,125 +594,6 @@ void StreamNodeGroup::cancelStreamThread()
 }
 
 /*
- * @Description: Wait all thread in the node group to quit
- *
- * @return: void
- */
-void StreamNodeGroup::quitSyncPoint()
-{
-    int timeout = 30;
-
-    if (StreamThreadAmI() == true) {
-        StreamPair* pair = NULL;
-        AutoMutexLock streamLock(&m_mutex);
-
-        /* signal the top consumer if i am the last stream thread. */
-        streamLock.lock();
-        m_streamEnter++;
-        m_streamEnterCount++;
-        Assert(u_sess->stream_cxt.producer_obj != NULL);
-        pair = (u_sess->stream_cxt.producer_obj)->getPair();
-
-        /* pair->subThreadNum - pair->startSubThreadNum is the supposed fail to launch thread. */
-        if (u_sess->stream_cxt.smp_id == 0)
-            m_quitWaitCond = m_quitWaitCond - 1 - (pair->expectThreadNum - pair->createThreadNum);
-        else
-            m_quitWaitCond = m_quitWaitCond - 1; /* other smp thread. */
-
-        Assert(m_quitWaitCond >= 0);
-        Assert(pair->expectThreadNum >= pair->createThreadNum);
-
-        if (m_quitWaitCond < 0) {
-            ereport(WARNING, (errmsg("Stream sub thread m_quitWaitCond invalid: %d. "
-                    "To get backtrace detail, set backtrace_min_messages=warning.", m_quitWaitCond)));
-            ereport(LOG, (errmsg("Stream info, smp id: %u, m_streamEnter: %d, m_streamEnterCount: %d, "
-                "ThreadId: %u, m_createThreadNum: %d, m_size: %d", 
-                u_sess->stream_cxt.smp_id, m_streamEnter, m_streamEnterCount,
-                (u_sess->stream_cxt.producer_obj)->getThreadId(), m_createThreadNum, m_size)));
-        }
-        if (m_quitWaitCond <= 0)
-            pthread_cond_broadcast(&m_cond);
-        else {
-            struct timespec ts;
-            while (m_quitWaitCond > 0) {
-                clock_gettime(CLOCK_REALTIME, &ts);
-                ts.tv_sec += timeout;
-                ts.tv_nsec = 0;
-                pthread_cond_timedwait(&m_cond, &m_mutex, &ts);
-            }
-        }
-        streamLock.unLock();
-    } else if (StreamTopConsumerAmI() == true) {
-        /* if none thread is created ,no bother to wait on condition. */
-        if (m_createThreadNum != 0) {
-            AutoMutexLock streamLock(&m_mutex);
-            streamLock.lock();
-
-            /* m_size - 1 - m_createNum means the failed producer thread. */
-            m_quitWaitCond = m_quitWaitCond - 1 - (m_size - 1 - m_createThreadNum);
-
-            Assert(m_quitWaitCond >= 0);
-            Assert(m_size >= m_createThreadNum);
-
-            if (m_quitWaitCond < 0) {
-                ereport(WARNING, (errmsg("Stream top consumer thread m_quitWaitCond invalid: %d. "
-                    "To get backtrace detail, set backtrace_min_messages=warning.", m_quitWaitCond)));
-                ereport(LOG, (errmsg("Stream info, m_streamEnter: %d, m_streamEnterCount: %d, m_createThreadNum: %d, m_size: %d", 
-                    m_streamEnter, m_streamEnterCount, m_createThreadNum, m_size)));
-            }
-            if (m_quitWaitCond <= 0)
-                pthread_cond_broadcast(&m_cond);
-            else {
-                /*
-                 * If inWaitingQuit is true, when we are interupted by a SIGINT signal,
-                 * we just send SIGINT to sub-thread to stop them, and we do not elog,
-                 * otherwise the waiting quit status of related threads will be broken.
-                 * Notes that inWaitQuit should be set before t_thrd.int_cxt.ImmediateInterruptOK be set,
-                 * and reset after t_thrd.int_cxt.ImmediateInterruptOK is reset, or there is an opportunity
-                 * that we meet a signal but inWaitingQuit has not been set.
-                 */
-                u_sess->stream_cxt.in_waiting_quit = true;
-
-                /*
-                 * Set it to true to enable signal handling when waiting sub-thread quit,
-                 * otherwise the cancel request will not be handled in this situation.
-                 */
-                t_thrd.int_cxt.ImmediateInterruptOK = true;
-
-                /*
-                 * If got a signal before t_thrd.int_cxt.ImmediateInterruptOK set to true, the signal can not be
-                 * processed immediately util top consumer goes back to ReadCommand again.
-                 * It maybe take long time to wait all stream threads come to quitSyncPoint
-                 * and then it's not necessary to send signal to stream threads any more.
-                 * Hence, signal should be handled soon here with CHECK_FOR_INTERRUPTS().
-                 */
-                CHECK_FOR_INTERRUPTS();
-
-                struct timespec ts;
-                while (m_quitWaitCond > 0) {
-                    clock_gettime(CLOCK_REALTIME, &ts);
-                    ts.tv_sec += timeout;
-                    ts.tv_nsec = 0;
-                    pthread_cond_timedwait(&m_cond, &m_mutex, &ts);
-                }
-
-                t_thrd.int_cxt.ImmediateInterruptOK = false;
-                u_sess->stream_cxt.in_waiting_quit = false;
-            }
-
-            if (m_streamEnterCount < m_createThreadNum) {
-                ereport(WARNING, (errmsg("Stream top consumer thread m_streamEnterCount invalid: %d", m_streamEnterCount)));
-                ereport(LOG, (errmsg("Stream info, m_streamEnter: %d, m_streamEnterCount: %d, m_createThreadNum: %d, m_size: %d", 
-                    m_streamEnter, m_streamEnterCount, m_createThreadNum, m_size)));
-            }
-
-            streamLock.unLock();
-        }
-    } else
-        return;
-}
-
-/*
  * @Description: Push a stream pair
  *
  * @param[IN] key:  stream key
@@ -855,7 +733,7 @@ void StreamNodeGroup::restoreStreamEnter()
     AutoMutexLock streamLock(&m_mutex);
 
     streamLock.lock();
-    m_streamEnter--;
+    m_quitThreadCount++;
     streamLock.unLock();
 }
 
@@ -994,6 +872,33 @@ void StreamNodeGroup::syncQuit(StreamObjStatus status)
             return;
         }
     }
+    if (StreamTopConsumerAmI()) {
+        /*
+         * If inWaitingQuit is true, when we are interupted by a SIGINT signal,
+         * we just send SIGINT to sub-thread to stop them, and we do not elog,
+         * otherwise the waiting quit status of related threads will be broken.
+         * Notes that inWaitQuit should be set before t_thrd.int_cxt.ImmediateInterruptOK be set,
+         * and reset after t_thrd.int_cxt.ImmediateInterruptOK is reset, or there is an opportunity
+         * that we meet a signal but inWaitingQuit has not been set.
+         */
+        u_sess->stream_cxt.in_waiting_quit = true;
+        /*
+         * Set it to true to enable signal handling when waiting sub-thread quit,
+         * otherwise the cancel request will not be handled in this situation.
+         */
+        t_thrd.int_cxt.ImmediateInterruptOK = true;
+
+        /*
+         * If got a signal before t_thrd.int_cxt.ImmediateInterruptOK set to true, the signal can not be
+         * processed immediately util top consumer goes back to ReadCommand again.
+         * It maybe take long time to wait all stream threads come to quitSyncPoint
+         * and then it's not necessary to send signal to stream threads any more.
+         * Hence, signal should be handled soon here with CHECK_FOR_INTERRUPTS().
+         */
+        CHECK_FOR_INTERRUPTS();
+        t_thrd.int_cxt.ImmediateInterruptOK = false;
+        u_sess->stream_cxt.in_waiting_quit = false;
+    }
 
     /* We must relase all pthread mutex by my thread, Or it will dead lock. But it is not a good solution. */
     // lock the same thread mutex can't be conflict in one thread.
@@ -1008,6 +913,8 @@ void StreamNodeGroup::syncQuit(StreamObjStatus status)
                 beentry->st_queryid, beentry->st_thread_level, beentry->st_smpid);
         }
     }
+     
+    HOLD_INTERRUPTS();
 
     if (StreamTopConsumerAmI()) {
         StreamNodeGroup::revokeStreamConnectPermission();
@@ -1043,8 +950,6 @@ void StreamNodeGroup::syncQuit(StreamObjStatus status)
             u_sess->stream_cxt.producer_obj->deInit(status);
         }
 
-        u_sess->stream_cxt.global_obj->quitSyncPoint();
-
         /* After syncpoint, all these objects may have been freed by topConsumer. */
         if (StreamThreadAmI()) {
             u_sess->stream_cxt.producer_obj = NULL;
@@ -1052,6 +957,9 @@ void StreamNodeGroup::syncQuit(StreamObjStatus status)
     }
 
     u_sess->stream_cxt.enter_sync_point = true;
+
+    RESUME_INTERRUPTS();
+
     pgstat_report_waitstatus(oldStatus);
 }
 
@@ -1089,12 +997,14 @@ void StreamNodeGroup::deInit(StreamObjStatus status)
 
     do {
         streamLock1.lock();
-        if (m_streamEnter <= 0 && m_streamEnterCount >= m_createThreadNum)
+        if (m_quitThreadCount >= m_createThreadNum) {
             saveQuit = true;
+        }
         streamLock1.unLock();
 
         pg_usleep(1000);
     } while (saveQuit == false);
+
 
     /* release the socket in case not release. */
     foreach (cell, m_streamProducerList) {
