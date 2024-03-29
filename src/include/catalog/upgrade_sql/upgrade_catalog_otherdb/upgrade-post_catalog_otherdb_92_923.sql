@@ -78,3 +78,38 @@ BEGIN
     RETURN ratio;
 END;
 $$ LANGUAGE plpgsql IMMUTABLE;
+
+DROP FUNCTION IF EXISTS pg_catalog.get_user_buffer_number(int) CASCADE;
+SET LOCAL inplace_upgrade_next_system_object_oids=IUO_PROC, 6624;
+
+CREATE FUNCTION pg_catalog.get_user_buffer_number(int)
+RETURNS int
+LANGUAGE INTERNAL IMMUTABLE as 'get_user_buffer_number';
+
+DROP FUNCTION IF EXISTS pg_catalog.set_buffer_strict_mode(bool) CASCADE;
+SET LOCAL inplace_upgrade_next_system_object_oids=IUO_PROC, 7844;
+
+CREATE FUNCTION pg_catalog.set_buffer_strict_mode(bool)
+RETURNS bool
+LANGUAGE INTERNAL IMMUTABLE as 'set_buffer_strict_mode';
+
+DROP FUNCTION IF EXISTS pg_catalog.get_user_bought_buffer_number(int) CASCADE;
+SET LOCAL inplace_upgrade_next_system_object_oids=IUO_PROC, 6625;
+
+CREATE FUNCTION pg_catalog.get_user_bought_buffer_number(int)
+RETURNS int
+LANGUAGE INTERNAL IMMUTABLE as 'get_user_bought_buffer_number';
+
+
+SET LOCAL inplace_upgrade_next_system_object_oids=IUO_PROC, 6623;
+
+CREATE FUNCTION pg_catalog.get_total_buffer_number()
+RETURNS int
+LANGUAGE INTERNAL IMMUTABLE as 'get_total_buffer_number';
+
+DROP FUNCTION IF EXISTS pg_catalog.set_user_buffer_number(int, int) CASCADE;
+SET LOCAL inplace_upgrade_next_system_object_oids=IUO_PROC, 7845;
+
+CREATE FUNCTION pg_catalog.set_user_buffer_number(int, int)
+RETURNS int
+LANGUAGE INTERNAL IMMUTABLE as 'set_buffer_strict_mode';

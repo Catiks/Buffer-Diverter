@@ -1328,6 +1328,12 @@ static void knl_t_storage_init(knl_t_storage_context* storage_cxt)
     storage_cxt->NvmBufferBlocks = NULL;
     storage_cxt->BackendWritebackContext = (WritebackContext*)palloc0(sizeof(WritebackContext));
     storage_cxt->SharedBufHash = NULL;
+#ifdef UBRL
+    // for (int i = 0; i < USER_SLOT_NUM; i++) {
+        storage_cxt->BufVictimHistoryHash = NULL;
+        storage_cxt->BufVictimHistory = NULL;
+    // }
+#endif
     storage_cxt->InProgressBuf = NULL;
     storage_cxt->ParentInProgressBuf = NULL;
     storage_cxt->IsForInput = false;
@@ -1352,6 +1358,9 @@ static void knl_t_storage_init(knl_t_storage_context* storage_cxt)
     storage_cxt->smoothed_alloc = 0;
     storage_cxt->smoothed_density = 10.0;
     storage_cxt->StrategyControl = NULL;
+#ifdef UBRL
+    storage_cxt->UserStrategyControl = NULL;
+#endif
     storage_cxt->CacheBlockInProgressIO = CACHE_BLOCK_INVALID_IDX;
     storage_cxt->CacheBlockInProgressUncompress = CACHE_BLOCK_INVALID_IDX;
     storage_cxt->MetaBlockInProgressIO = CACHE_BLOCK_INVALID_IDX;

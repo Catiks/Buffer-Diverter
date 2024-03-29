@@ -3114,6 +3114,9 @@ typedef struct knl_session_context {
 
     /* standby write. */
     knl_u_libsw_context libsw_cxt;
+#ifdef UBRL
+    int user_slot;
+#endif
 } knl_session_context;
 
 enum stp_xact_err_type {
@@ -3150,7 +3153,9 @@ extern void set_function_style_none();
 extern void set_function_style_a();
 extern void set_function_style_pg();
 extern bool set_is_create_plsql_type();
-
+#ifdef UBRL
+extern bool attach_user_buffer_slot(Oid user_id, knl_session_context* sess);
+#endif
 extern THR_LOCAL knl_session_context* u_sess;
 
 #ifdef ENABLE_MOT

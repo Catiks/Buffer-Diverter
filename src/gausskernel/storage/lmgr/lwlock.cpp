@@ -546,6 +546,11 @@ static void InitializeLWLocks(int numLocks)
 
     Assert((lock - t_thrd.shemem_ptr_cxt.mainLWLockArray) == NUM_INDIVIDUAL_LWLOCKS);
 
+#ifdef UBRL
+    for (id = 0; id < NUM_BUFFER_PARTITIONS; id++, lock++) {
+        LWLockInitialize(&lock->lock, LWTRANCHE_BUFMAPPING);
+    }
+#endif
     for (id = 0; id < NUM_BUFFER_PARTITIONS; id++, lock++) {
         LWLockInitialize(&lock->lock, LWTRANCHE_BUFMAPPING);
     }

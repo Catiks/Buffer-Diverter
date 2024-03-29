@@ -2604,6 +2604,10 @@ typedef struct knl_t_storage_context {
     char* NvmBufferBlocks;
     struct WritebackContext* BackendWritebackContext;
     struct HTAB* SharedBufHash;
+#ifdef UBRL
+    struct HTAB* BufVictimHistoryHash; //[USER_SLOT_NUM];
+    struct UserStrategyVictimHistory* BufVictimHistory; //[USER_SLOT_NUM];
+#endif
     struct HTAB* BufFreeListHash;
     struct BufferDesc* InProgressBuf;
     struct BufferDesc* ParentInProgressBuf;
@@ -2675,6 +2679,10 @@ typedef struct knl_t_storage_context {
 
     /* Pointers to shared state */
     struct BufferStrategyControl* StrategyControl;
+#ifdef UBRL
+    struct UserStrategy* UserStrategyControl;
+    struct UserBufferDesc* UserBuffers;
+#endif
     int NLocBuffer; /* until buffers are initialized */
     struct BufferDesc* LocalBufferDescriptors;
     Block* LocalBufferBlockPointers;

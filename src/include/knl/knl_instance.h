@@ -501,6 +501,65 @@ typedef struct knl_g_audit_context {
     volatile uint32 audit_coru_fnum[MAX_AUDIT_NUM];
 } knl_g_audit_context;
 
+#ifdef UBRL
+
+/*
+ * UserBufferInfo is used to the information of user's useage of the buffer,
+ * including the user's candidate list.
+ * UserBufferStatistic is used to record the user who access the buffer,
+ * Informations about the reinforcment learning algorithm is not included in this file.
+ * to find the information about the reinforcement learning algorithm, please refer to
+ * t_thrd.storage_cxt.UserStrategyControl in src/include/storage/buf/bufmgr.h
+ */
+typedef struct UserInfo {
+    //protect user_id
+    slock_t user_lock;
+    // protect user buffer link
+    slock_t buffer_link_lock;
+    // protect user victim history list
+    slock_t victim_history_lock;
+    uint64 user_id;
+    int user_buffer_bought;
+    bool in_use;
+    // candidate buffer information
+    int user_buffer_candidate_size;
+    pg_atomic_uint64 candidate_head;
+    pg_atomic_uint64 candidate_tail;
+    Buffer* user_buffer_candidate_list;
+
+    float8 buffer_occupation_score;
+    int slot;
+    pg_atomic_uint32 numBufferAllocs; /* Buffers allocated since last reset */
+    /*TOTAL_BUFFER_NUM mean not used before*/
+    pg_atomic_uint32 nextVictimBuffer;
+    pg_atomic_uint32 numBufferAccessed;
+    pg_atomic_uint32 numBufferVictim;
+} UserInfo;
+#define USER_BUFFER_TOPK 3
+
+/* UserBufferStatistic is used to record the user who access the buffer, 
+and who disuse a buffer */
+typedef struct UserBufferStatistic {
+    int user_info_index;
+} UserBufferStatistic;
+
+typedef struct UserBufferInfo {
+    // this lock used to protect BufferDesc->next|prec 
+    /* protect buffer_user_oid*/
+    slock_t user_info_lock; /* protect user_info */
+    /* top K users of buffer consumtion  size of 3 */
+    slock_t topk_user_lock;
+    int topk_user[USER_BUFFER_TOPK];
+    /* size of 20,only change in init */
+    UserInfo user_info[USER_SLOT_NUM];
+    pg_atomic_uint32 UBStatistic_access_index;
+    pg_atomic_uint32 UBStatistic_victim_index;
+    /*if in strict mode, user's buffer is limited in the size of the bought num*/
+    bool strict_mode;
+} UserBufferInfo;
+
+#endif
+
 /* incremental checkpoint */
 typedef struct knl_g_ckpt_context {
     uint64 dirty_page_queue_reclsn;
@@ -565,6 +624,11 @@ typedef struct knl_g_ckpt_context {
 
     struct IncreCkptSyncShmemStruct* incre_ckpt_sync_shmem;
 
+#ifdef UBRL
+    // information for user aware buffer control
+    struct UserBufferStatistic *user_buffer_statistic;
+    struct UserBufferInfo *user_buffer_info;
+#endif
     uint64 pad[TWO_UINT64_SLOT];
 } knl_g_ckpt_context;
 

@@ -3,3 +3,8 @@ DROP FUNCTION IF EXISTS pg_catalog.array_integer_agg_add(int[], int[]) CASCADE;
 DROP FUNCTION IF EXISTS pg_catalog.calculate_coverage(numbers int[]) CASCADE;
 DROP FUNCTION IF EXISTS pg_catalog.coverage_arrays(booleans bool[], integers int[]) CASCADE;
 DROP FUNCTION IF EXISTS pg_catalog.generate_procoverage_report(int8, int8) CASCADE;
+DROP FUNCTION IF EXISTS pg_catalog.get_user_buffer_number(int) CASCADE;
+DROP FUNCTION IF EXISTS pg_catalog.set_buffer_strict_mode(bool) CASCADE;
+DROP FUNCTION IF EXISTS pg_catalog.get_total_buffer_number() CASCADE;
+DROP FUNCTION IF EXISTS pg_catalog.set_user_buffer_number(int, int) CASCADE;
+DROP FUNCTION IF EXISTS pg_catalog.get_user_bought_buffer_number(int) CASCADE;

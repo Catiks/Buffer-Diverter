@@ -160,7 +160,13 @@ const struct LWLOCK_PARTITION_DESC LWLockPartInfo[] = {
 
 /* Offsets for various chunks of preallocated lwlocks in main array. */
 #define FirstBufMappingLock (NUM_INDIVIDUAL_LWLOCKS)
+#ifdef UBRL
+/* need for victim history, so alloc 2X num partitions*/
+#define FirstLockMgrLock (FirstBufMappingLock + NUM_BUFFER_PARTITIONS * 2)
+#define FirstHufHisMappingLock (FirstBufMappingLock + NUM_BUFFER_PARTITIONS)
+#else
 #define FirstLockMgrLock (FirstBufMappingLock + NUM_BUFFER_PARTITIONS)
+#endif
 #define FirstPredicateLockMgrLock (FirstLockMgrLock + NUM_LOCK_PARTITIONS)
 #define FirstOperatorRealTLock (FirstPredicateLockMgrLock + NUM_PREDICATELOCK_PARTITIONS)
 #define FirstOperatorHistLock (FirstOperatorRealTLock + NUM_OPERATOR_REALTIME_PARTITIONS)

@@ -1090,3 +1090,91 @@ Datum pg_column_is_updatable(PG_FUNCTION_ARGS)
 
     PG_RETURN_BOOL((events & REQ_EVENTS) == REQ_EVENTS);
 }
+
+Datum get_user_buffer_number(PG_FUNCTION_ARGS)
+{
+    Oid uid = PG_GETARG_OID(0);
+    int res = 0;
+    for (int i = 0; i < USER_SLOT_NUM; i++) {
+        if (g_instance.ckpt_cxt_ctl->user_buffer_info->user_info[i].user_id == uid) {
+            res = (int)g_instance.ckpt_cxt_ctl->user_buffer_info->user_info[i].numBufferAllocs;
+        }
+    }
+    PG_RETURN_INT32(res);
+}
+
+Datum get_user_bought_buffer_number(PG_FUNCTION_ARGS)
+{
+    Oid uid = PG_GETARG_OID(0);
+    int res = 0;
+    for (int i = 0; i < USER_SLOT_NUM; i++) {
+        if (g_instance.ckpt_cxt_ctl->user_buffer_info->user_info[i].user_id == uid) {
+            res = (int)g_instance.ckpt_cxt_ctl->user_buffer_info->user_info[i].user_buffer_bought;
+        }
+    }
+    PG_RETURN_INT32(res);
+}
+Datum set_buffer_strict_mode(PG_FUNCTION_ARGS)
+{
+    bool mode = PG_GETARG_BOOL(0);
+    g_instance.ckpt_cxt_ctl->user_buffer_info->strict_mode = mode;
+    PG_RETURN_BOOL(true);
+}
+
+Datum get_total_buffer_number(PG_FUNCTION_ARGS)
+{
+    Oid uid = PG_GETARG_OID(0);
+    int res = g_instance.attr.attr_storage.NBuffers;
+    PG_RETURN_INT32(res);
+}
+Datum set_user_buffer_number(PG_FUNCTION_ARGS)
+{
+    Oid uid = PG_GETARG_OID(0);
+
+    int new_size = PG_GETARG_INT32(1);
+
+    if (new_size <= 0) {
+        ereport(ERROR,
+            (errcode(ERRCODE_INVALID_AGG),
+                errmsg("Invalid buffer size %d", new_size),
+                errhint("size should be greater than 0")));
+    } else if (new_size < g_instance.attr.attr_storage.NBuffers * 0.01) {
+        ereport(WARNING,
+            (errcode(ERRCODE_INVALID_AGG),
+                errmsg("New buffer size %d is to small", new_size),
+                errhint("size should be greater than %d", g_instance.attr.attr_storage.NBuffers * 0.01)));
+        new_size = g_instance.attr.attr_storage.NBuffers * 0.01;
+    }
+    S_LOCK(&g_instance.ckpt_cxt_ctl->user_buffer_info->user_info_lock);
+    int size_left = ((int)g_instance.ckpt_cxt_ctl->user_buffer_info->user_info[0].user_buffer_bought) - \
+                    g_instance.attr.attr_storage.NBuffers * 0.1;
+    int target_index = -1;
+    for (int i = 1; i < USER_SLOT_NUM; i++) {
+        if (g_instance.ckpt_cxt_ctl->user_buffer_info->user_info[i].user_id == uid) {
+            target_index = i;
+            break;
+        }
+    }
+    int size_occu_two = g_instance.ckpt_cxt_ctl->user_buffer_info->user_info[target_index].user_buffer_bought + \
+                        g_instance.ckpt_cxt_ctl->user_buffer_info->user_info[0].user_buffer_bought;
+
+    if (target_index > 0) {
+        if (size_left > new_size -  g_instance.ckpt_cxt_ctl->user_buffer_info->user_info[target_index].user_buffer_bought) {
+            g_instance.ckpt_cxt_ctl->user_buffer_info->user_info[target_index].user_buffer_bought = new_size;
+            g_instance.ckpt_cxt_ctl->user_buffer_info->user_info[0].user_buffer_bought = size_occu_two - new_size;
+            ereport(INFO,
+                (errmsg("set user buffer number to %d", new_size)));
+        } else {
+            new_size = size_occu_two - g_instance.attr.attr_storage.NBuffers * 0.1;
+            g_instance.ckpt_cxt_ctl->user_buffer_info->user_info[target_index].user_buffer_bought = new_size;
+            g_instance.ckpt_cxt_ctl->user_buffer_info->user_info[0].user_buffer_bought = size_occu_two - new_size;
+            ereport(WARNING,
+                (errmsg("buffer is not enough, set user buffer size to %d", new_size)));
+        }
+        S_UNLOCK(&g_instance.ckpt_cxt_ctl->user_buffer_info->user_info_lock);
+        PG_RETURN_INT32(new_size);
+    } else {
+        S_UNLOCK(&g_instance.ckpt_cxt_ctl->user_buffer_info->user_info_lock);
+        PG_RETURN_INT32(-1);
+    }
+}

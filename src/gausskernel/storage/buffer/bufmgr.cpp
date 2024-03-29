@@ -2999,11 +2999,46 @@ BufferDesc *BufferAlloc(const RelFileNode &rel_file_node, char relpersistence, F
     /* determine its hash code and partition lock ID */
     new_hash = BufTableHashCode(&new_tag);
 
+#ifdef UBRL
+    UserBufferDesc * user_buffer;
+    int history_buf_id = -1;
+    /* in the thread init case, the currentUserId is 0, so we will not use it */
+    UserInfo* current_userInfo = &g_instance.ckpt_cxt_ctl->user_buffer_info->user_info[u_sess->user_slot];
+    UserInfo* index_userInfo = NULL;
+    Oid index_uid = InvalidOid;
+    uint32 index = pg_atomic_fetch_add_u32(&g_instance.ckpt_cxt_ctl->user_buffer_info->UBStatistic_access_index, 1);
+    uint32 index_expect = index+1;
+    if (index >= (uint32)UB_STATISTICS_NUM) {
+        index %= UB_STATISTICS_NUM;
+        pg_atomic_compare_exchange_u32(&g_instance.ckpt_cxt_ctl->user_buffer_info->UBStatistic_access_index, \
+                                        &index_expect, index_expect%(UB_STATISTICS_NUM));
+    }
+    int index_user_index = g_instance.ckpt_cxt_ctl->user_buffer_statistic[index].user_info_index;
+    if (index_user_index != current_userInfo->slot) {
+        if (index_user_index >= 0 ) {
+            index_userInfo = &g_instance.ckpt_cxt_ctl->user_buffer_info->user_info[index_user_index];
+            pg_atomic_sub_fetch_u32(&index_userInfo->numBufferAccessed, 1);
+            
+        }
+        g_instance.ckpt_cxt_ctl->user_buffer_statistic[index].user_info_index = current_userInfo->slot;
+        pg_atomic_add_fetch_u32(&current_userInfo->numBufferAccessed, 1);
+    }
+#endif
+
+
 retry:
     /* see if the block is in the buffer pool already */
     pgstat_report_waitevent(WAIT_EVENT_BUF_HASH_SEARCH);
     buf_id = BufTableLookup(&new_tag, new_hash);
+#ifdef UBRL
+    history_buf_id = UserBufVictimHisTableLookup(&new_tag, new_hash);
+#endif
     pgstat_report_waitevent(WAIT_EVENT_END);
+#ifdef UBRL
+    if (history_buf_id >= 0) {
+        UpdateRLStrategy(history_buf_id, &new_tag, new_hash, u_sess->user_slot);
+    }
+#endif
     if (buf_id >= 0) {
         /*
          * Found it.  Now, pin the buffer so no one can steal it from the
@@ -3048,6 +3083,19 @@ retry:
 
         return buf;
     }
+#ifdef UBRL
+    // need to choose a victim buffer, so choose a victim user first
+    // and the choose a strategy
+    int victim_user_slot = -1;
+    victim_user_slot = choose_top_user(u_sess->user_slot);
+    Assert(u_sess->user_slot != -1);
+    BufferDesc *last_buf = NULL;
+    // not found, choose a strategy, check the strategy history
+    // ereport(WARNING, ((errmsg("update strategy for buffer"))));
+    BufferDesc *old_buf = NULL;
+    bool tag_is_valid = false;
+
+#endif
 
     new_partition_lock = BufMappingPartitionLock(new_hash);
     /* Loop here in case we have to try another victim buffer */
@@ -3063,7 +3111,15 @@ retry:
          * spinlock still held!
          */
         pgstat_report_waitevent(WAIT_EVENT_BUF_STRATEGY_GET);
+#ifdef UBRL
+
+        buf = (BufferDesc *)StrategyGetBuffer(strategy, &buf_state, false); // strategy_id, victim_user_slot,  last_buf);
+        user_buffer = GetUserBufferDescriptor(buf->buf_id);
+
+        last_buf = buf;
+#else
         buf = (BufferDesc *)StrategyGetBuffer(strategy, &buf_state);
+#endif
         pgstat_report_waitevent(WAIT_EVENT_END);
 
         Assert(BUF_STATE_GET_REFCOUNT(buf_state) == 0);
@@ -3202,6 +3258,11 @@ retry:
             /* if it wasn't valid, we need only the new partition */
             (void)LWLockAcquire(new_partition_lock, LW_EXCLUSIVE);
             /* these just keep the compiler quiet about uninit variables */
+            // ereport(WARNING, (errmsg("old tag is  invalid for buf %d:%d", buf->buf_id, old_hash)));
+            // ereport(WARNING, (errmsg("buf tag is %u, %u, %u, %d, %d, %d, %d", buf->tag.rnode.spcNode, buf->tag.rnode.dbNode,
+            //             buf->tag.rnode.relNode, buf->tag.rnode.bucketNode, buf->tag.rnode.opt, buf->tag.forkNum,
+            //             buf->tag.blockNum)));
+
             old_hash = 0;
             old_partition_lock = NULL;
         }
@@ -3214,6 +3275,8 @@ retry:
          * Note that we have not yet removed the hashtable entry for the old
          * tag.
          */
+        // ereport(WARNING, (errmsg("Buf is inserted, id is %d, hash is %u", buf->buf_id, new_hash)));
+
         buf_id = BufTableInsert(&new_tag, new_hash, buf->buf_id);
         if (buf_id >= 0) {
             /*
@@ -3326,7 +3389,12 @@ retry:
         GetDmsBufCtrl(buf->buf_id)->been_loaded = false;
     }
 
+    user_buffer = GetUserBufferDescriptor(buf->buf_id);
+    int victom_user_slot = user_buffer->user_slot;
+    int next_history = -1;
+    UserInfo * victim_user_info = &g_instance.ckpt_cxt_ctl->user_buffer_info->user_info[victom_user_slot];
     if (old_flags & BM_TAG_VALID) {
+        tag_is_valid = true;
         BufTableDelete(&old_tag, old_hash);
         if (old_partition_lock != new_partition_lock) {
             LWLockRelease(old_partition_lock);
@@ -3346,7 +3414,89 @@ retry:
         buf->extra->seg_blockno = InvalidBlockNumber;
     }
     LWLockRelease(new_partition_lock);
+
+#ifdef UBRL
+    // before return, update the buffer in the list
+    // do it before unlock bufhdr
+
+    int user_slot;
+    // 假设不会有多个线程同时到达这里。
+    UserInfo *current_user_info = &g_instance.ckpt_cxt_ctl->user_buffer_info->user_info[u_sess->user_slot];
+
+    UserStrategy * current_user_strategy = &t_thrd.storage_cxt.UserStrategyControl[u_sess->user_slot];
+    UserStrategy * victim_user_strategy = &t_thrd.storage_cxt.UserStrategyControl[victom_user_slot];
+    UserBufferDesc* user_buf_victim_pos = NULL;
+    Assert(current_user_info != NULL);
+    // UserInfo *victim_user_info = NULL;
+    int insert_position = -1;
+    int strategy_id = user_buffer->strategy_id;
+    /*victom buffer not belong to current user or from the candicate list*/
+    /* remove it from the original list */
+        // this buffer is in any uer buffer ragion
+    S_LOCK(&victim_user_info->buffer_link_lock);
+    victim_user_info->numBufferAllocs -= 1;
+
+    for (int i = 0; i < NUM_STRATEGY; i++) {
+        GetUserBufferDescriptor(user_buffer->links[i].prev)->links[i].next = user_buffer->links[i].next;
+        GetUserBufferDescriptor(user_buffer->links[i].next)->links[i].prev = user_buffer->links[i].prev;
+
+        if (victim_user_info->numBufferAllocs == 0) {
+            pg_atomic_write_u32(&victim_user_strategy->BufferInfo[i].nextVictimBuffer, INVALID_USER_VICTIM);
+        } else if (victim_user_strategy->BufferInfo[i].nextVictimBuffer == user_buffer->buf_id) {
+            // if this buffer is exactly the nextVictim, redirect nextVictimBuffer to the next
+            pg_atomic_write_u32(&victim_user_strategy->BufferInfo[i].nextVictimBuffer, user_buffer->links[i].next);
+            // GetBufferDescriptor(bufHdr->next_id)->user_buffer_state = USER_BUFFER_BUSY;
+        }
+    }
+    S_UNLOCK(&victim_user_info->buffer_link_lock);
+    
+    /*----remove done----*/
+    /* if the buffer is the first buffer in the list, update the first buffer */
+    
+    S_LOCK(&current_user_info->buffer_link_lock);
+    if (current_user_info->numBufferAllocs == 0) {
+        // pg_atomic_write_u32(&current_user_info->nextVictimBuffer, user_buffer->buf_id);
+        // make self-loop
+        for (int i = 0; i < NUM_STRATEGY; i++) {
+            current_user_strategy->BufferInfo[i].nextVictimBuffer = user_buffer->buf_id;
+            user_buffer->links[i].next = user_buffer->buf_id;
+            user_buffer->links[i].prev = user_buffer->buf_id;
+        }
+    } else {
+        /* finish insert */
+        for (int i = 0; i < NUM_STRATEGY; i++) {
+                // insert ahead of victim
+            insert_position = pg_atomic_read_u32(&current_user_strategy->BufferInfo[i].nextVictimBuffer); 
+            user_buf_victim_pos = GetUserBufferDescriptor(insert_position);
+            int prev = user_buf_victim_pos->links[i].prev;
+            GetUserBufferDescriptor(prev)->links[i].next = user_buffer->buf_id;
+            user_buf_victim_pos->links[i].prev = user_buffer->buf_id;
+            user_buffer->links[i].prev = prev;
+            user_buffer->links[i].next = insert_position;
+            if (i == MRU) {
+                // for MRU, change current victim to this buffer
+                pg_atomic_write_u32(&current_user_strategy->BufferInfo[i].nextVictimBuffer, user_buffer->buf_id);
+            }
+        }
+    }
+    current_user_info->numBufferAllocs++;
+    user_buffer->user_slot = u_sess->user_slot;
+    // bufHdr->user_buffer_state = USER_BUFFER_CLEAN;
+    S_UNLOCK(&current_user_info->buffer_link_lock);
+
+#endif
+
     UnlockBufHdr(buf, buf_state);
+
+#ifdef UBRL
+    //为原来的找一个合适的history条目
+    if (tag_is_valid) {
+        next_history = get_user_next_victim_history(victim_user_slot);
+        StrategyUpdateHistory(next_history, &old_tag, old_hash, strategy_id);
+    }
+    // StrategyReplaceBuffer(buf, &old_tag, old_hash, tag_is_valid, strategy_id, victim_user_slot);
+    user_buffer->removed = false;
+#endif
     /*
      * Buffer contents are currently invalid.  Try to get the io_in_progress
      * lock.  If StartBufferIO returns false, then someone else managed to

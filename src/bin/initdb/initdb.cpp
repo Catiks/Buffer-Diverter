@@ -3248,7 +3248,8 @@ static void vacuum_db(void)
     (void)fflush(stdout);
 
     nRet = snprintf_s(
-        cmd, sizeof(cmd), sizeof(cmd) - 1, "\"%s\" %s template1 >%s 2>&1", backend_exec, backend_options, DEVNULL);
+        cmd, sizeof(cmd), sizeof(cmd) - 1, "\"%s\" %s template1 2>&1", backend_exec, backend_options);
+        // cmd, sizeof(cmd), sizeof(cmd) - 1, "\"%s\" %s template1 >%s 2>&1", backend_exec, backend_options, DEVNULL);
     securec_check_ss_c(nRet, "\0", "\0");
 
     PG_CMD_OPEN;

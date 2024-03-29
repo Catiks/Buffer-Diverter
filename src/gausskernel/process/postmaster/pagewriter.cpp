@@ -89,6 +89,9 @@ static void ckpt_try_prune_dirty_page_queue();
 static uint32 calculate_pagewriter_flush_num();
 static void candidate_buf_push(CandidateList *list, int buf_id);
 static void init_candidate_list();
+#ifdef UBRL
+static bool candidate_buf_push_user(int thread_id, int buf_id);
+#endif
 static uint32 incre_ckpt_pgwr_flush_dirty_page(WritebackContext *wb_context,
     const CkptSortItem *dirty_buf_list, int start, int batch_num);
 static void incre_ckpt_pgwr_flush_dirty_queue(WritebackContext *wb_context);
@@ -391,6 +394,30 @@ static void init_candidate_list()
             seg_end += SEGMENT_BUFFER_NUM % thread_num;
         }
 
+#ifdef UBRL
+        int u_start = start;
+        bool found_user_candidate = false;
+        char shmem_name[128];
+        int normal_size = end - start;
+        for (int j = 0; j < USER_SLOT_NUM; j++) {
+            found_user_candidate = false;
+            UserInfo *user_info = &g_instance.ckpt_cxt_ctl->user_buffer_info->user_info[j];
+            if (user_info->user_buffer_bought == (uint64)0) {
+                pgwr->user_candidate_list[j] = NULL;
+                pgwr->user_list[j].cand_list_size = 0;
+                continue;
+            }
+            sprintf(shmem_name, "CandidateBuffers of user slot %d in thread %d", j, i);
+
+            pgwr->user_candidate_list[j] = (Buffer *) ShmemInitStruct(shmem_name, 
+                            normal_size * sizeof(Buffer), &found_user_candidate);
+            INIT_CANDIDATE_LIST(pgwr->user_list[j], pgwr->user_candidate_list[j], end - start, 0, 0);
+            pgwr->user_list[j].buf_id_start = start;
+            if (!found_user_candidate) {
+                MemSet((char*)pgwr->user_candidate_list[j], 0, normal_size * sizeof(Buffer));
+            }
+        }
+#endif
         INIT_CANDIDATE_LIST(pgwr->normal_list, &cand_buffers[start], end - start, 0, 0);
         INIT_CANDIDATE_LIST(pgwr->nvm_list, &cand_buffers[nvm_start], nvm_end - nvm_start, 0, 0);
         INIT_CANDIDATE_LIST(pgwr->seg_list, &cand_buffers[seg_start], seg_end - seg_start, 0, 0);
@@ -2358,7 +2385,18 @@ static void incre_ckpt_pgwr_scan_buf_pool(WritebackContext *wb_context)
     PageWriterProc *pgwr = &g_instance.ckpt_cxt_ctl->pgwr_procs.writer_proc[thread_id];
 
     /* handle the normal\nvm\segment buffer pool */
+
+#ifdef UBRL
+    for (int i = 0; i < USER_SLOT_NUM; i++) {
+        if (pgwr->user_list[i].cand_list_size == 0) {
+            continue;
+        }
+        incre_ckpt_pgwr_scan_candidate_list(wb_context, &pgwr->user_list[i], CAND_LIST_NORMAL);
+    }
+#else
     incre_ckpt_pgwr_scan_candidate_list(wb_context, &pgwr->normal_list, CAND_LIST_NORMAL);
+
+#endif
     incre_ckpt_pgwr_scan_candidate_list(wb_context, &pgwr->nvm_list, CAND_LIST_NVM);
     incre_ckpt_pgwr_scan_candidate_list(wb_context, &pgwr->seg_list, CAND_LIST_SEG);
     return;
@@ -2387,6 +2425,9 @@ static uint32 get_candidate_buf_and_flush_list(uint32 start, uint32 end, uint32 
     PageWriterProc *pgwr = &g_instance.ckpt_cxt_ctl->pgwr_procs.writer_proc[thread_id];
     CkptSortItem *dirty_buf_list = pgwr->dirty_buf_list;
 
+#ifdef UBRL
+        bool push_done = true;
+#endif
     ResourceOwnerEnlargeBuffers(t_thrd.utils_cxt.CurrentResourceOwner);
 
     max_flush_num = ((FULL_CKPT && !RecoveryInProgress()) ? 0 : max_flush_num);
@@ -2395,6 +2436,12 @@ static uint32 get_candidate_buf_and_flush_list(uint32 start, uint32 end, uint32 
         buf_desc = GetBufferDescriptor(buf_id);
         local_buf_state = pg_atomic_read_u64(&buf_desc->state);
 
+        // if (buf_id < 5) {
+        //     if (local_buf_state & BUF_FLAG_MASK & BM_TAG_VALID) 
+        //         ereport(WARNING, (errmsg_internal("In writed before insert, buf : %d, tag is valid", buf_id)));
+        //     else
+        //         ereport(WARNING, (errmsg_internal("In writed before insert, buf : %d, tag is not valid", buf_id)));
+        // } 
         /* during recovery, check the data page whether not properly marked as dirty */
         if (RecoveryInProgress() && check_buffer_dirty_flag(buf_desc)) {
             if (need_flush_num < max_flush_num) {
@@ -2424,13 +2471,26 @@ static uint32 get_candidate_buf_and_flush_list(uint32 start, uint32 end, uint32 
         if (!(local_buf_state & BM_DIRTY)) {
             if (g_instance.ckpt_cxt_ctl->candidate_free_map[buf_id] == false) {
                 if (buf_id < (uint32)NvmBufferStartID) {
+#ifdef UBRL
+                    UserBufferDesc *userbuf_desc = GetUserBufferDescriptor(buf_id);
+                    int user_slot = userbuf_desc->user_slot;
+                    if (user_slot > -1) 
+                        candidate_buf_push(&pgwr->user_list[user_slot], buf_id);
+                    else
+                        push_done = false; // push failed
+#else
                     candidate_buf_push(&pgwr->normal_list, buf_id);
+#endif
                 } else if (buf_id < (uint32)SegmentBufferStartID) {
                     candidate_buf_push(&pgwr->nvm_list, buf_id);
                 } else {
                     candidate_buf_push(&pgwr->seg_list, buf_id);
                 }
+#ifdef UBRL
+                g_instance.ckpt_cxt_ctl->candidate_free_map[buf_id] = push_done;
+#else
                 g_instance.ckpt_cxt_ctl->candidate_free_map[buf_id] = true;
+#endif
                 candidates++;
             }
             goto UNLOCK;
@@ -2457,6 +2517,13 @@ PUSH_DIRTY:
 
 UNLOCK:
         UnlockBufHdr(buf_desc, local_buf_state);
+        // if (buf_id < 5) {
+        //     if (local_buf_state & BUF_FLAG_MASK & BM_TAG_VALID) 
+        //         ereport(WARNING, (errmsg_internal("In writed After insert, buf : %d, tag is valid", buf_id)));
+        //     else
+        //         ereport(WARNING, (errmsg_internal("In writed After insert, buf : %d, tag is not valid", buf_id)));
+        // } 
+
     }
 
     if (u_sess->attr.attr_storage.log_pagewriter) {
@@ -2479,22 +2546,55 @@ static void push_to_candidate_list(BufferDesc *buf_desc)
         return;
     }
 
+#ifdef UBRL
+    bool push_done = true;
+#endif
     if (g_instance.ckpt_cxt_ctl->candidate_free_map[buf_id] == false) {
         buf_state = LockBufHdr(buf_desc);
+        // if (buf_id < 5) {
+        //     if (buf_state & BUF_FLAG_MASK & BM_TAG_VALID) 
+        //         ereport(WARNING, (errmsg_internal("In push_to_candidate_list Before insert, buf : %d, tag is valid", buf_id)));
+        //     else
+        //         ereport(WARNING, (errmsg_internal("In push_to_candidate_list Before insert, buf : %d, tag is not valid", buf_id)));
+        // } 
+
         if (g_instance.ckpt_cxt_ctl->candidate_free_map[buf_id] == false) {
             emptyUsageCount = (!NEED_CONSIDER_USECOUNT || BUF_STATE_GET_USAGECOUNT(buf_state) == 0);
             if (BUF_STATE_GET_REFCOUNT(buf_state) == 0 && emptyUsageCount && !(buf_state & BM_DIRTY)) {
                 if (buf_id < NvmBufferStartID) {
+#ifdef UBRL
+                    UserBufferDesc *userbuf_desc = GetUserBufferDescriptor(buf_id);
+                    int user_slot = userbuf_desc->user_slot;
+                    if (user_slot > -1) {
+                        candidate_buf_push(&pgwr->user_list[user_slot], buf_id);
+                    } else {
+                        ereport(WARNING, (errmsg_internal("Buffer %d not belong to any user", buf_id)));
+                        push_done = false;
+                    }
+#else
                     candidate_buf_push(&pgwr->normal_list, buf_id);
+#endif
                 } else if (buf_id < SegmentBufferStartID) {
                     candidate_buf_push(&pgwr->nvm_list, buf_id);
                 } else {
                     candidate_buf_push(&pgwr->seg_list, buf_id);
                 }
+#ifdef UBRL
+                g_instance.ckpt_cxt_ctl->candidate_free_map[buf_id] = push_done;
+#else
                 g_instance.ckpt_cxt_ctl->candidate_free_map[buf_id] = true;
+#endif
             }
         }
         UnlockBufHdr(buf_desc, buf_state);
+        // if (buf_id < 5) {
+        //     if (buf_state & BUF_FLAG_MASK & BM_TAG_VALID) 
+        //         ereport(WARNING, (errmsg_internal("In push_to_candidate_list After insert, buf : %d, tag is valid", buf_id)));
+        //     else
+        //         ereport(WARNING, (errmsg_internal("In push_to_candidate_list After insert, buf : %d, tag is not valid", buf_id)));
+        // } 
+
+
     }
     return;
 }
@@ -2522,6 +2622,58 @@ static void candidate_buf_push(CandidateList *list, int buf_id)
     list->cand_buf_list[tail_loc] = buf_id;
     (void)pg_atomic_fetch_add_u64(&list->tail, 1);
 }
+
+#ifdef UBRL
+bool candidate_buf_push_user(CandidateList* list, int user_slot, int buf_id) 
+{
+    UserInfo* userinfo = &g_instance.ckpt_cxt_ctl->user_buffer_info->user_info[user_slot];
+    BufferDesc* buf_desc = GetBufferDescriptor(buf_id);
+
+    Buffer* candidate_list = userinfo->user_buffer_candidate_list;
+    uint32 list_size = userinfo->user_buffer_candidate_size;
+    uint32 tail_loc;
+
+    pg_memory_barrier();
+    volatile uint64 head = pg_atomic_read_u64(&userinfo->candidate_head);
+    pg_memory_barrier();
+    volatile uint64 tail = pg_atomic_read_u64(&userinfo->candidate_tail);
+
+    if (unlikely(tail - head >= list_size)) {
+        return false;
+    }
+    tail_loc = tail % list_size;
+    candidate_list[tail_loc] = buf_id;
+    (void)pg_atomic_fetch_add_u64(&userinfo->candidate_tail, 1);
+    return true;
+}
+
+bool candidate_buf_pop_user(int user_slot, int *buf_id)
+{
+    UserInfo* userinfo = &g_instance.ckpt_cxt_ctl->user_buffer_info->user_info[user_slot];
+
+    Buffer* candidate_list = userinfo->user_buffer_candidate_list;
+    uint32 list_size = userinfo->user_buffer_candidate_size;
+
+    uint32 head_loc;
+
+    while (true) {
+        pg_memory_barrier();
+        uint64 head = pg_atomic_read_u64(&userinfo->candidate_head);
+        pg_memory_barrier();
+        volatile uint64 tail = pg_atomic_read_u64(&userinfo->candidate_tail);
+
+        if (unlikely(head >= tail)) {
+            return false;       /* candidate list is empty */
+        }
+        head_loc = head % list_size;
+        *buf_id = candidate_list[head_loc];
+        if (pg_atomic_compare_exchange_u64(&userinfo->candidate_head, &head, head + 1)) {
+            return true;
+        }
+    }
+
+}
+#endif
 
 /**
  * @Description: Pop a buffer from the head of thread threadId's candidate list and store the buffer in buf_id.
@@ -2582,9 +2734,36 @@ uint32 get_curr_candidate_nums(CandListType type)
         }
 
         if (pgwr->proc != NULL) {
+#ifdef UBRL
+            if (type == CAND_LIST_NORMAL) {
+                for (int j = 0; j < USER_SLOT_NUM; j++) {
+                    currCandidates += get_thread_candidate_nums(&pgwr->user_list[j]);
+                }
+            } else {
+                currCandidates += get_thread_candidate_nums(list);
+            }
+#else
             currCandidates += get_thread_candidate_nums(list);
+#endif
         }
     }
+#ifdef UNUSED
+    if (type == CAND_LIST_NORMAL) {
+        for (int j = 0; j < USER_SLOT_NUM; j++) {
+            UserInfo *user_info = &g_instance.ckpt_cxt_ctl->user_buffer_info->user_info[j];
+            if (user_info->user_buffer_bought == (uint64)0)
+                continue;
+            volatile uint64 head = pg_atomic_read_u64(&user_info->candidate_head);
+            pg_memory_barrier();
+            volatile uint64 tail = pg_atomic_read_u64(&user_info->candidate_tail);
+            int64 curr_cand_num = tail - head;
+            Assert(curr_cand_num >= 0);
+            currCandidates += curr_cand_num;
+        }
+    }
+#endif
+
+
     return currCandidates;
 }
 

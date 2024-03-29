@@ -1706,6 +1706,11 @@ extern Datum text_float4(PG_FUNCTION_ARGS);
 extern Datum text_float8(PG_FUNCTION_ARGS);
 extern Datum text_numeric(PG_FUNCTION_ARGS);
 extern Datum getDistributeKey(PG_FUNCTION_ARGS);
+extern Datum get_user_buffer_number(PG_FUNCTION_ARGS);
+extern Datum get_total_buffer_number(PG_FUNCTION_ARGS);
+extern Datum set_user_buffer_number(PG_FUNCTION_ARGS);
+extern Datum get_user_bought_buffer_number(PG_FUNCTION_ARGS);
+
 extern Datum text_timestamp(PG_FUNCTION_ARGS);
 extern void encryptOBS(char* srcplaintext, char destciphertext[], uint32 destcipherlength);
 extern void decryptOBS(

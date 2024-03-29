@@ -1462,6 +1462,9 @@ void knl_session_init(knl_session_context* sess_cxt)
     DLInitElem(&sess_cxt->elem, sess_cxt);
     DLInitElem(&sess_cxt->elem2, sess_cxt);
 
+#ifdef UBRL
+    sess_cxt->user_slot = 0;
+#endif
     sess_cxt->attachPid = InvalidTid;
     sess_cxt->top_transaction_mem_cxt = NULL;
     sess_cxt->self_mem_cxt = NULL;
@@ -1658,6 +1661,39 @@ knl_session_context* create_session_context(MemoryContext parent, uint64 id)
     MemoryContextSwitchTo(old_cxt);
     return sess;
 }
+#ifdef UBRL
+bool attach_user_buffer_slot(Oid user_id, knl_session_context* sess) {
+    UserInfo* user_info_i = NULL;
+    uint64 user_id_i = INVALID_BUFFER_USER_ID;
+    bool found = false;
+    //0 is reseved for user id = 0;
+    for (int i = 0; i < USER_SLOT_NUM; i++) {
+        user_info_i = &g_instance.ckpt_cxt_ctl->user_buffer_info->user_info[i];
+        user_id_i = user_info_i->user_id;
+        S_LOCK(&user_info_i->user_lock);
+        if (user_id_i == INVALID_BUFFER_USER_ID) {
+            user_info_i->user_id = user_id;
+            sess->user_slot = i;
+            user_info_i->in_use = true;
+            ereport(WARNING, (errmsg_internal("attach new slot [%d] with user %u", i, user_id)));
+            S_UNLOCK(&user_info_i->user_lock);
+            found = true;
+            break;
+        } else if (user_id_i == user_id) {
+            // not current user, we only need to find the slot
+            ereport(WARNING, (errmsg_internal("find existing slot [%d] with user %u", i, user_id)));
+            sess->user_slot = i;
+            user_info_i->in_use = true;
+            S_UNLOCK(&user_info_i->user_lock);
+            found = true;
+            break;
+        }
+        S_UNLOCK(&user_info_i->user_lock);
+    }
+    return found;
+}
+
+#endif
 
 void use_fake_session()
 {

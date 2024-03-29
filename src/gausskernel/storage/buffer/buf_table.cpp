@@ -60,7 +60,102 @@ void InitBufTable(int size)
     t_thrd.storage_cxt.SharedBufHash = ShmemInitHash("Shared Buffer Lookup Table", size, size, &info,
                                                      HASH_ELEM | HASH_FUNCTION | HASH_PARTITION);
 }
+#ifdef UBRL
+void InitUserVictimHisTable( int size)
+{
+    HASHCTL info;
+    /* assume no locking is needed yet
+     *
+     * BufferTag maps to Buffer
+     */
+    info.keysize = sizeof(BufferTag);
+    info.entrysize = sizeof(BufferLookupEnt);
+    info.hash = tag_hash;
+    info.num_partitions = NUM_BUFFER_PARTITIONS;
 
+    char shmem_name[128];
+    // UserInfo * user_info = &g_instance.ckpt_cxt_ctl->user_buffer_info->user_info[user_slot];
+    // int his_hash_size = user_info->user_buffer_bought * NUM_STRATEGY;
+
+    // if (his_hash_size > 0) {
+    sprintf(shmem_name, "User Buffer Victim History");
+
+    t_thrd.storage_cxt.BufVictimHistoryHash = ShmemInitHash(shmem_name, size, size, &info,
+                                                HASH_ELEM | HASH_FUNCTION | HASH_PARTITION);
+    
+}
+int UserBufVictimHisTableLookup(BufferTag *tag, uint32 hashcode)
+{
+    BufferLookupEnt *result = NULL;
+
+    result = (BufferLookupEnt *)buf_hash_operate<HASH_FIND>(
+                            t_thrd.storage_cxt.BufVictimHistoryHash, 
+                            tag, hashcode, NULL);
+    // ereport(WARNING, ((errmsg("Lookup user buffer victim history block %u fork %u for user %d.", tag->blockNum, tag->forkNum, user_slot))));
+
+    if (SECUREC_UNLIKELY(result == NULL)) {
+        return -1;
+    }
+
+    return result->id;
+}
+int UserBufVictimHisTableInsert(BufferTag *tag, uint32 hashcode, int buf_id)
+{
+    BufferLookupEnt *result = NULL;
+    bool found = false;
+
+    Assert(buf_id >= 0);            /* -1 is reserved for not-in-table */
+    Assert(tag->blockNum != P_NEW); /* invalid tag */
+
+    result = (BufferLookupEnt *)buf_hash_operate<HASH_ENTER>(
+                            t_thrd.storage_cxt.BufVictimHistoryHash,
+                            tag, hashcode, &found);
+    // ereport(WARNING, ((errmsg("Insert user buffer victim history block %u fork %u for user %d.", tag->blockNum, tag->forkNum, user_slot))));
+
+    if (found) { /* found something already in the table */
+        return result->id;
+    }
+
+    result->id = buf_id;
+
+    return -1;
+}
+
+/*
+ * BufTableDelete
+ *		Delete the hashtable entry for given tag (which must exist)
+ *
+ * Caller must hold exclusive lock on BufMappingLock for tag's partition
+ */
+int UserBufVictimHisTableDelete(BufferTag *tag, uint32 hashcode)
+{
+    BufferLookupEnt *result = NULL;
+
+    result = (BufferLookupEnt *)buf_hash_operate<HASH_REMOVE>(
+                            t_thrd.storage_cxt.BufVictimHistoryHash,
+                            tag, hashcode, NULL);
+    if (result == NULL) { /* not found */
+        ereport(WARNING, (errcode(ERRCODE_DATA_CORRUPTED), (errmsg("User buffer victim history hash table corrupted."))));
+
+        return -1;
+    } else {
+        return result->id;
+    }
+}
+int BufTableSetValue(BufferTag *tag, uint32 hashcode, int id)
+{
+    BufferLookupEnt *result = NULL;
+
+    result = (BufferLookupEnt *)buf_hash_operate<HASH_FIND>(t_thrd.storage_cxt.SharedBufHash, tag, hashcode, NULL);
+
+    if (SECUREC_UNLIKELY(result == NULL)) {
+        return -1;
+    }
+    result->id = id;
+    return result->id;
+}
+
+#endif
 /*
  * BufTableHashCode
  *		Compute the hash code associated with a BufferTag

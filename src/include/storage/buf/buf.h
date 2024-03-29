@@ -24,6 +24,9 @@ typedef int Buffer;
 
 #define InvalidBuffer 0
 
+#ifdef UBRL
+#define USER_SLOT_NUM 20
+#endif
 /*
  * BufferIsInvalid
  *		True iff the buffer is invalid.

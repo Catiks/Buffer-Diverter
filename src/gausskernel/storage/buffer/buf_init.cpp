@@ -77,6 +77,15 @@ void InitBufferPool(void)
     bool found_buf_extra = false;
     uint64 buffer_size;
     BufferDescExtra *extra = NULL;
+#ifdef UBRL
+    bool found_user_buffers = false;
+    bool found_user_buffer_info = false;
+    bool found_user_buffer_statistic = false;
+    bool found_user_buffer_empty_list = false;
+    bool found_user_buffer_list = false;
+    bool found_user_buffer_candidate_list = false;
+    bool found_user_buffer_candidate_thread_list = false;
+#endif
 
     t_thrd.storage_cxt.BufferDescriptors = (BufferDescPadded *)CACHELINEALIGN(
         ShmemInitStruct("Buffer Descriptors",
@@ -87,6 +96,93 @@ void InitBufferPool(void)
         ShmemInitStruct("Buffer Descriptors Extra",
                         TOTAL_BUFFER_NUM * sizeof(BufferDescExtra) + PG_CACHE_LINE_SIZE,
                         &found_buf_extra));
+
+#ifdef UBRL
+    ereport(WARNING, (errmsg_internal("Searching user buffer information for user %u", u_sess->misc_cxt.CurrentUserId)));
+
+    t_thrd.storage_cxt.UserBuffers = (UserBufferDesc *)CACHELINEALIGN(
+                                                ShmemInitStruct("User Buffer Descriptors",
+                                                    NORMAL_SHARED_BUFFER_NUM * sizeof(UserBufferDesc) + PG_CACHE_LINE_SIZE,
+                                                    &found_user_buffers));
+    g_instance.ckpt_cxt_ctl->user_buffer_info = (UserBufferInfo*)
+                                                ShmemInitStruct("User Buffer Info",
+                                                    sizeof(UserBufferInfo),
+                                                    &found_user_buffer_info);
+    g_instance.ckpt_cxt_ctl->user_buffer_statistic = (UserBufferStatistic*)
+                                                ShmemInitStruct("User Buffer Statistic",
+                                                    UB_STATISTICS_NUM * sizeof(UserBufferStatistic),
+                                                    &found_user_buffer_statistic);
+
+    Assert(g_instance.ckpt_cxt_ctl->user_buffer_info);
+    Assert(g_instance.ckpt_cxt_ctl->user_buffer_statistic);
+
+    int user_start = 0;
+    if (!found_user_buffer_info) {
+        SpinLockInit(&g_instance.ckpt_cxt_ctl->user_buffer_info->user_info_lock);
+        SpinLockInit(&g_instance.ckpt_cxt_ctl->user_buffer_info->topk_user_lock);
+        pg_atomic_init_u32(&g_instance.ckpt_cxt_ctl->user_buffer_info->UBStatistic_access_index, 0);
+        pg_atomic_init_u32(&g_instance.ckpt_cxt_ctl->user_buffer_info->UBStatistic_victim_index, 0);
+        ereport(WARNING, (errmsg_internal("not found user buffer info")));
+        int buf_left = NORMAL_SHARED_BUFFER_NUM;
+        // default strict mode
+        g_instance.ckpt_cxt_ctl->user_buffer_info->strict_mode = true;
+        for (int i = 0; i < USER_SLOT_NUM; i++) {
+            UserInfo * user_info = &g_instance.ckpt_cxt_ctl->user_buffer_info->user_info[i];
+            user_info->user_id = INVALID_BUFFER_USER_ID;
+            SpinLockInit(&user_info->user_lock);
+            SpinLockInit(&user_info->buffer_link_lock);
+            SpinLockInit(&user_info->victim_history_lock);
+            /* Initialize the clock sweep pointer */
+            user_info->buffer_occupation_score = 0;
+            user_info->slot = i;
+            user_info->in_use = false;
+
+            switch(i) {
+                case 0:
+                    // for user with uid 0?
+                    user_info->user_buffer_bought = NORMAL_SHARED_BUFFER_NUM * 0.1;
+                    buf_left -= user_info->user_buffer_bought;
+                    break;
+                case 1:
+                    user_info->user_buffer_bought = NORMAL_SHARED_BUFFER_NUM *0.2;
+                    buf_left -= user_info->user_buffer_bought;
+                    break;
+                case 2:
+                    user_info->user_buffer_bought =  buf_left;
+                    break;
+                case 3:
+                    user_info->user_buffer_bought = 0;
+                    break;
+                default:
+                    user_info->user_buffer_bought = 0;
+                    break;
+            }
+            pg_atomic_init_u32(&user_info->nextVictimBuffer, (INVALID_USER_VICTIM));
+            pg_atomic_init_u32(&user_info->numBufferAllocs, 0);
+            pg_atomic_init_u32(&user_info->numBufferAccessed, 0);
+            pg_atomic_init_u32(&user_info->numBufferVictim, 0);
+
+            user_start += user_info->user_buffer_bought;
+
+            // only for test
+        }
+        for (int i = 0; i < USER_BUFFER_TOPK; i++) {
+            g_instance.ckpt_cxt_ctl->user_buffer_info->topk_user[i] = -1;
+        }
+    } else {
+        ereport(WARNING, (errmsg_internal("user buffer info found")));
+    }
+    if (!found_user_buffer_statistic) {
+        ereport(WARNING, (errmsg_internal("not found user buffer statistic")));
+
+        for (int i = 0; i < UB_STATISTICS_NUM; i++) {
+            g_instance.ckpt_cxt_ctl->user_buffer_statistic[i].user_info_index = -1;
+            // t_thrd.storage_cxt.user_buffer_stat[i].buffer_access_user_slot_id = -1;
+            // t_thrd.storage_cxt.user_buffer_stat[i].buffer_victim_user_slot_id = -1;
+        }
+    }
+    // t_thrd.storage_cxt.current_user_index = -1;
+#endif
 
     /* Init candidate buffer list and candidate buffer free map */
     candidate_buf_init();
@@ -155,14 +251,20 @@ void InitBufferPool(void)
         g_instance.bgwriter_cxt.unlink_rel_fork_hashtbl =
             relfilenode_fork_hashtbl_create("unlink_rel_one_fork_hashtbl", true);
     }
+#ifdef UBRL
+    if (found_descs || found_bufs || found_buf_ckpt || found_buf_extra || found_user_buffer_info || found_user_buffers) {
+        /* both should be present or neither */
+        Assert(found_descs && found_bufs && found_buf_ckpt && found_buf_extra && found_user_buffer_info && found_user_buffers);
+#else
 
     if (found_descs || found_bufs || found_buf_ckpt || found_buf_extra) {
+#endif
+
         /* both should be present or neither */
         Assert(found_descs && found_bufs && found_buf_ckpt && found_buf_extra);
         /* note: this path is only taken in EXEC_BACKEND case */
     } else {
         int i;
-
         /*
          * Initialize all the buffer headers.
          */
@@ -235,6 +337,15 @@ Size BufferShmemSize(void)
 
     /* size of candidate buffers */
     size = add_size(size, mul_size(TOTAL_BUFFER_NUM, sizeof(Buffer)));
+#ifdef UBRL
+    size = add_size(size, mul_size(NORMAL_SHARED_BUFFER_NUM, sizeof(UserBufferDesc)));
+    size = add_size(size, sizeof(UserBufferInfo));
+    size = add_size(size, mul_size(UB_STATISTICS_NUM, sizeof(UserBufferStatistic)));
+    // size = add_size(size, mul_size(NORMAL_SHARED_BUFFER_NUM * USER_SLOT_NUM, sizeof(Buffer)));
+    size = add_size(size, mul_size(USER_SLOT_NUM, sizeof(UserStrategy) + sizeof(UserInfo)));
+    /* victim history list*/
+    size = add_size(size, mul_size(NORMAL_SHARED_BUFFER_NUM * NUM_STRATEGY , sizeof(UserStrategyVictimHistory)));
+#endif
 
     /* size of candidate free map */
     size = add_size(size, mul_size(TOTAL_BUFFER_NUM, sizeof(bool)));

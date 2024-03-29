@@ -160,6 +160,14 @@ typedef struct {
 #define BufMappingPartitionLockByIndex(i) \
 	(&t_thrd.shemem_ptr_cxt.mainLWLockArray[FirstBufMappingLock + (i)].lock)
 
+#ifdef UBRL
+#define BufHisTableHashPartition(hashcode) ((hashcode) % NUM_BUFFER_PARTITIONS)
+#define BufHisMappingPartitionLock(hashcode) \
+	(&t_thrd.shemem_ptr_cxt.mainLWLockArray[FirstBufMappingLock + NUM_BUFFER_PARTITIONS+ \
+		BufTableHashPartition(hashcode)].lock)
+#define BufHisMappingPartitionLockByIndex(i) \
+	(&t_thrd.shemem_ptr_cxt.mainLWLockArray[FirstBufMappingLock + NUM_BUFFER_PARTITIONS + (i)].lock)
+#endif
 /*
  *	BufferDesc -- shared descriptor/state data for a single shared buffer.
  *
@@ -256,6 +264,77 @@ typedef union BufferDescPadded {
     BufferDesc bufferdesc;
     char pad[BUFFERDESC_PAD_TO_SIZE];
 } BufferDescPadded;
+#ifdef UBRL
+
+#define UB_STATISTICS_NUM ((int)((NORMAL_SHARED_BUFFER_NUM)/2))
+// #define USER_SLOT_NUM 20
+
+#define NUM_STRATEGY 2
+
+#define LRU 0
+#define MRU 1
+#define MAX(A, B) ((B) > (A) ? (B) : (A))
+
+typedef struct RLStrategy {
+    double weight[NUM_STRATEGY];
+    double lr[3];
+    double hit_rate[3];
+    int unlearnCount;
+} RLStrategy;
+typedef struct RLBufferInfo {
+    int head;
+    int tail;
+    pg_atomic_uint32 nextVictimBuffer;
+    int64 size;
+    LWLock *lock;
+} RLBufferInfo;
+
+typedef struct UserStrategyVictimHistory
+{
+	slock_t     lock;
+    int			prev;			/* list links */
+	int			next;
+    bool        valid;          /* this record is valid */
+    uint64      timestemp;
+    int         strategy;       /* indicate witch strategy it was replaced out */
+	BufferTag	buf_tag;		/* page identifier */
+    uint32      buf_hash;       /* buffer state */
+	int			id;			    /* recore id in the total list, or -1 */
+} UserStrategyVictimHistory;
+
+typedef struct UserStrategy {
+    RLStrategy Strategy;
+    RLBufferInfo BufferInfo[NUM_STRATEGY];    
+    int listFreeBuffers;
+    int history_head;
+    int history_tail;
+    pg_atomic_uint32 next_history;
+    UserStrategyVictimHistory* victimHistory;
+
+} UserStrategy;
+
+#endif
+
+
+#ifdef UBRL
+typedef struct BufLink {
+    int next;
+    int prev;
+} BufLink;
+
+/*Record the user_id of each buffer, and the links*/
+typedef struct UserBufferDesc {
+    int buf_id;
+    Oid user_id;
+    int user_slot;
+    slock_t user_buffer_lock;
+    BufLink links[NUM_STRATEGY];
+    int strategy_id; // by which strategy this buffer is selected
+    bool removed;
+} UserBufferDesc;
+#define GetUserBufferDescriptor(id) (&t_thrd.storage_cxt.UserBuffers[(id)])
+
+#endif
 
 #define GetBufferDescriptor(id) (&t_thrd.storage_cxt.BufferDescriptors[(id)].bufferdesc)
 #define GetLocalBufferDescriptor(id) ((BufferDesc *)&u_sess->storage_cxt.LocalBufferDescriptors[(id)].bufferdesc)
@@ -355,7 +434,12 @@ extern void IssuePendingWritebacks(WritebackContext* context);
 extern void ScheduleBufferTagForWriteback(WritebackContext* context, BufferTag* tag);
 
 /* freelist.c */
+
+#ifdef UBRL
+extern BufferDesc *StrategyGetBuffer(BufferAccessStrategy strategy, uint64 *buf_state, bool use_own = true);//, int strategy_id, int user_slot, BufferDesc *last_buf);
+#else
 extern BufferDesc *StrategyGetBuffer(BufferAccessStrategy strategy, uint64 *buf_state);
+#endif
 
 extern void StrategyFreeBuffer(volatile BufferDesc* buf);
 extern bool StrategyRejectBuffer(BufferAccessStrategy strategy, BufferDesc* buf);
@@ -375,6 +459,34 @@ extern int BufTableLookup(BufferTag* tagPtr, uint32 hashcode);
 extern int BufTableInsert(BufferTag* tagPtr, uint32 hashcode, int buf_id);
 extern void BufTableDelete(BufferTag* tagPtr, uint32 hashcode);
 
+#ifdef UBRL
+#define INVALID_BUFFER_USER_ID UINT64_MAX
+#define INVALID_USER_VICTIM UINT32_MAX
+extern BufferDesc *StrategyGetBufferRL(BufferAccessStrategy strategy, uint64 *buf_state, int strategy_id, int user_slot, BufferDesc* last_buf);
+extern BufferDesc * StrategyUpdateBuffer(BufferDesc *buf, int user_slot);
+extern bool StrategyBackBuffer(BufferDesc *user_buf, int user_slot, bool head = true);
+
+// extern int UpdateRLStrategy(BufferTag new_tag, uint32 new_hash, int user_slot);
+extern int UpdateRLStrategy(int victim_buffer_id, BufferTag* tag, uint32 hash, int user_slot);
+
+extern int chooseRLStrategy(bool is_current_user);
+extern void updateRLLearnRate(int user_slot);
+extern void StrategyReplaceBuffer(BufferDesc *buf, BufferTag *oldTag, uint32 old_hash, bool tag_valid, int strategy, int user_slot);
+extern void StrategyUpdateHistory(int next_item_id, BufferTag *oldTag, uint32 old_hash, int strategy);
+
+extern bool search_remove_user_buffer_slot(uint64 user_id);
+extern void update_topk_user(int slot_id);
+extern bool pushBackBuffer(BufferDesc* buf_desc);
+extern int choose_top_user(int current_user_slot);
+extern int get_user_next_victim_history(int victim_user_slot) ;
+extern void InitUserVictimHisTable(int size);
+extern int UserBufVictimHisTableLookup(BufferTag *tag, uint32 hashcode);
+extern int UserBufVictimHisTableInsert(BufferTag *tag, uint32 hashcode, int buf_id);
+extern int UserBufVictimHisTableDelete(BufferTag *tag, uint32 hashcode);
+
+extern int BufTableSetValue(BufferTag *tag, uint32 hashcode, int id);
+
+#endif
 /* localbuf.c */
 extern void LocalPrefetchBuffer(SMgrRelation smgr, ForkNumber forkNum, BlockNumber blockNum);
 extern BufferDesc* LocalBufferAlloc(SMgrRelation smgr, ForkNumber forkNum, BlockNumber blockNum, bool* foundPtr);

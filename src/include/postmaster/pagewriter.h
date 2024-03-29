@@ -84,6 +84,11 @@ typedef struct PageWriterProc {
     CandidateList nvm_list;
     CandidateList seg_list;
 
+#ifdef UBRL
+    bool free_used_up;
+    CandidateList user_list[USER_SLOT_NUM];
+    Buffer * user_candidate_list[USER_SLOT_NUM];
+#endif
     /* auxiluary structs for implementing AIO in DSS */
     DSSAioCxt aio_cxt;
     char *aio_buf;
@@ -177,6 +182,10 @@ extern const incre_ckpt_view_col g_pagewriter_view_col[PAGEWRITER_VIEW_COL_NUM];
 extern const incre_ckpt_view_col g_pagewirter_view_two_col[CANDIDATE_VIEW_COL_NUM];
 
 extern bool candidate_buf_pop(CandidateList *list, int *buf_id);
+#ifdef UBRL
+bool candidate_buf_pop_user(int user_slot, int *buf_id);
+#endif
+
 extern void candidate_buf_init(void);
 
 extern uint32 get_curr_candidate_nums(CandListType type);

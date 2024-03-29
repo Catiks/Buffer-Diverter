@@ -402,6 +402,9 @@ static void SetSessionUserId(Oid userid, bool is_superuser)
     u_sess->misc_cxt.OuterUserId = userid;
     u_sess->misc_cxt.CurrentUserId = userid;
 
+#ifdef UBRL
+    attach_user_buffer_slot(u_sess->misc_cxt.CurrentUserId, u_sess);
+#endif
     /* update user id in MyBEEntry */
     if (t_thrd.shemem_ptr_cxt.MyBEEntry != NULL)
         t_thrd.shemem_ptr_cxt.MyBEEntry->st_userid = userid;

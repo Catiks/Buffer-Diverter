@@ -59,6 +59,8 @@
 #ifndef WIN32
 #include <cxxabi.h>
 #endif /* win-odbc */
+#define UBRL
+#define USER_SLOT_NUM 20
 
 #ifndef HDFS_FDW
 #define HDFS_FDW "hdfs_fdw"
