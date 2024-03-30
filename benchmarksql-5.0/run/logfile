@@ -1,0 +1,386 @@
+0 LOG:  [Alarm Module]can not read GAUSS_WARNING_TYPE env.
+	
+0 LOG:  [Alarm Module]Host Name: localhost.localdomain 
+	
+0 LOG:  [Alarm Module]Host IP: localhost.localdomain. Copy hostname directly in case of taking 10s to use 'gethostbyname' when /etc/hosts does not contain <HOST IP>
+	
+0 LOG:  [Alarm Module]Get ENV GS_CLUSTER_NAME failed!
+	
+0 LOG:  [Alarm Module]Invalid data in AlarmItem file! Read alarm English name failed! line: 57
+	
+0 WARNING:  failed to open feature control file, please check whether it exists: FileName=gaussdb.version, Errno=2, Errmessage=No such file or directory.
+0 WARNING:  failed to parse feature control file: gaussdb.version.
+0 WARNING:  Failed to load the product control file, so gaussdb cannot distinguish product version.
+0 LOG:  bbox_dump_path is set to /tmp/
+2023-10-31 09:55:32.335 [MOT] <TID:3520090/-----> <SID:-----/-----> [INFO]     <System>             Startup: Loading configuration from /opt/test/data/mot.conf
+2023-10-31 09:55:32.430 [MOT] <TID:3520090/-----> <SID:-----/-----> [INFO]     <Configuration>      Configuring total memory for relative memory values to: 12288 MB
+2023-10-31 09:55:32.431 [MOT] <TID:3520090/-----> <SID:-----/-----> [INFO]     <Configuration>      Loading max_connections from envelope into MOTEngine: 4096
+2023-10-31 09:55:32.431 [MOT] <TID:3520090/-----> <SID:-----/-----> [WARNING]  <Configuration>      Adjusted maximum number of threads to 4096 due to maximum limit
+2023-10-31 09:55:32.431 [MOT] <TID:3520090/-----> <SID:-----/-----> [INFO]     <Configuration>      Configuring synchronous redo-log handler
+2023-10-31 09:55:32.431 [MOT] <TID:3520090/-----> <SID:-----/-----> [WARNING]  <Configuration>      Adjusting MOT memory limits: global = 8623 MB, local = 1617 MB, session large store = 0 MB, total = 10240 MB
+2023-10-31 09:55:32.431 [MOT] <TID:3520090/-----> <SID:-----/-----> [INFO]     <Memory>             Global Memory Limit is configured to: 0 MB --> 8623 MB
+2023-10-31 09:55:32.431 [MOT] <TID:3520090/-----> <SID:-----/-----> [INFO]     <Memory>             Local Memory Limit is configured to: 0 MB --> 1617 MB
+2023-10-31 09:55:32.431 [MOT] <TID:3520090/-----> <SID:-----/-----> [INFO]     <Memory>             Session Memory Limit is configured to: 0 KB --> 0 KB (maximum 4096 sessions)
+2023-10-31 09:55:32.431 [MOT] <TID:3520090/-----> <SID:-----/-----> [INFO]     <Memory>             Configured automatic chunk allocation policy to 'CHUNK-INTERLEAVED' on 8 nodes NUMA machine in PRODUCTION mode
+2023-10-31 09:55:32.451 [MOT] <TID:3520090/-----> <SID:-----/-----> [WARNING]  <System>             NUMA policy in the system is set to automatic. (/proc/sys/kernel/numa_balancing is 1)
+2023-10-31 09:55:32.451 [MOT] <TID:3520090/-----> <SID:-----/-----> [INFO]     <System>             Startup: Affinity initialized - numaNodes = 8, coresPerCpu = 32, sessionAffinityMode = 1, taskAffinityMode = 1
+2023-10-31 09:55:32.601 [MOT] <TID:3520090/04088> <SID:-----/-----> [INFO]     <System>             Startup: All core services Initialized successfully
+2023-10-31 09:55:32.601 [MOT] <TID:3520090/04088> <SID:-----/-----> [INFO]     <RedoLog>            Using synchronous redo log handler
+2023-10-31 09:55:32.601 [MOT] <TID:3520090/04088> <SID:-----/-----> [INFO]     <Logger>             Using external logger
+2023-10-31 09:55:32.601 [MOT] <TID:3520090/04088> <SID:-----/-----> [INFO]     <System>             Startup: Redo-log handler initialized successfully
+2023-10-31 09:55:32.601 [MOT] <TID:3520090/04088> <SID:-----/-----> [INFO]     <Checkpoint>         CheckpointControlFile: init - a previous checkpoint was not found
+2023-10-31 09:55:32.601 [MOT] <TID:3520090/04088> <SID:-----/-----> [INFO]     <Recovery>           MTLSRecoveryManager: Initialized successfully
+2023-10-31 09:55:32.601 [MOT] <TID:3520090/04088> <SID:-----/-----> [INFO]     <System>             Startup: Recovery manager initialized successfully
+2023-10-31 09:55:32.601 [MOT] <TID:3520300/-----> <SID:-----/-----> [INFO]     <Checkpoint>         CheckpointWorker0 - Starting
+2023-10-31 09:55:32.602 [MOT] <TID:3520300/00000> <SID:00000/00000> [INFO]     <GC>                 GC PARAMS: 
+2023-10-31 09:55:32.602 [MOT] <TID:3520300/00000> <SID:00000/00000> [INFO]     <GC>                 QUEUE0:DELETE_QUEUE SizeLimit = 1KB, SizeLimitHigh = 8192KB, Count = 500
+2023-10-31 09:55:32.602 [MOT] <TID:3520300/00000> <SID:00000/00000> [INFO]     <GC>                 QUEUE1:VERSION_QUEUE SizeLimit = 100KB, SizeLimitHigh = 8192KB, Count = 1000
+2023-10-31 09:55:32.602 [MOT] <TID:3520300/00000> <SID:00000/00000> [INFO]     <GC>                 QUEUE2:UPDATE_COLUMN_QUEUE SizeLimit = 0KB, SizeLimitHigh = 8192KB, Count = 100000
+2023-10-31 09:55:32.602 [MOT] <TID:3520300/00000> <SID:00000/00000> [INFO]     <GC>                 QUEUE3:GENERIC_QUEUE SizeLimit = 100KB, SizeLimitHigh = 8192KB, Count = 1000
+2023-10-31 09:55:32.603 [MOT] <TID:3520301/-----> <SID:-----/-----> [INFO]     <Checkpoint>         CheckpointWorker1 - Starting
+2023-10-31 09:55:32.604 [MOT] <TID:3520302/-----> <SID:-----/-----> [INFO]     <Checkpoint>         CheckpointWorker2 - Starting
+2023-10-31 09:55:32.605 [MOT] <TID:3520090/04088> <SID:-----/-----> [INFO]     <System>             Startup: Checkpoint manager initialized successfully
+2023-10-31 09:55:32.606 [MOT] <TID:3520090/04088> <SID:-----/-----> [INFO]     <System>             Startup: MOT Engine initialization finished successfully
+2023-10-31 09:55:32.606 [MOT] <TID:3520090/04088> <SID:-----/-----> [INFO]     <FDW>                Switching to External snapshot manager
+2023-10-31 09:55:32.606 [MOT] <TID:3520090/04088> <SID:-----/-----> [INFO]     <JitExec>            MOT JIT execution is disabled by user configuration
+2023-10-31 09:55:35.329 [MOT] <TID:3520303/00003> <SID:00003/00003> [INFO]     <Recovery>           Starting MOT recovery
+2023-10-31 09:55:35.329 [MOT] <TID:3520303/00003> <SID:00003/00003> [INFO]     <FDW>                Registered current thread for proc-exit callback for thread 0x7f4f077ff640
+2023-10-31 10:01:27.366  [postmaster][reaper][140235604894016] LOG: startupprocess exit
+2023-10-31 10:01:28.71  [postmaster][reaper][140235604894016] LOG: checkpoint thread exit and nowait for sharestorage
+2023-10-31 10:01:28.072 [MOT] <TID:3520090/04088> <SID:-----/-----> [INFO]     <System>             Shutdown: Shutting down MOT Engine
+2023-10-31 10:01:28.072 [MOT] <TID:3520090/04088> <SID:-----/-----> [INFO]     <System>             Shutdown: All background tasks stopped
+2023-10-31 10:01:28.072 [MOT] <TID:3520090/04088> <SID:-----/-----> [INFO]     <System>             Destroying the Checkpoint Manager
+2023-10-31 10:01:28.072 [MOT] <TID:3520301/-----> <SID:-----/-----> [INFO]     <Checkpoint>         CheckpointWorker1 - Exiting
+2023-10-31 10:01:28.072 [MOT] <TID:3520302/-----> <SID:-----/-----> [INFO]     <Checkpoint>         CheckpointWorker2 - Exiting
+2023-10-31 10:01:28.072 [MOT] <TID:3520300/-----> <SID:-----/-----> [INFO]     <Checkpoint>         CheckpointWorker0 - Exiting
+2023-10-31 10:01:28.073 [MOT] <TID:3520090/04088> <SID:-----/-----> [INFO]     <System>             Destroying the Recovery Manager
+2023-10-31 10:01:28.073 [MOT] <TID:3520090/04088> <SID:-----/-----> [INFO]     <System>             Destroying the Redo Log Handler
+2023-10-31 10:01:28.073 [MOT] <TID:3520090/04088> <SID:-----/-----> [INFO]     <System>             Shutdown: All tables cleared
+2023-10-31 10:01:28.073 [MOT] <TID:3520090/04088> <SID:-----/-----> [INFO]     <System>             Shutdown: Key surrogate manager destroyed
+2023-10-31 10:01:28.073 [MOT] <TID:3520090/04088> <SID:-----/-----> [INFO]     <System>             Shutdown: Table manager destroyed
+2023-10-31 10:01:28.073 [MOT] <TID:3520090/04088> <SID:-----/-----> [INFO]     <System>             Shutdown: Session manager destroyed
+2023-10-31 10:01:28.073 [MOT] <TID:3520090/04088> <SID:-----/-----> [INFO]     <Memory>             Kernel allocation MM Layer Pre-Shutdown Report report:
+  NUMA Interleaved memory usage: Current = 1 MB, Peak = 1 MB
+  NUMA Local memory usage: Current = 332 MB, Peak = 352 MB
+
+2023-10-31 10:01:28.114 [MOT] <TID:3520090/04088> <SID:-----/-----> [INFO]     <Memory>             Huge memory: 0 MB Used, 0 MB Requested, 0 objects
+
+2023-10-31 10:01:28.115 [MOT] <TID:3520090/04088> <SID:-----/-----> [INFO]     <Memory>             Kernel allocation MM Layer Post-Shutdown Report report:
+  NUMA Interleaved memory usage: Current = 0 MB, Peak = 1 MB
+  NUMA Local memory usage: Current = 0 MB, Peak = 352 MB
+
+2023-10-31 10:01:28.115 [MOT] <TID:3520090/04088> <SID:-----/-----> [INFO]     <Memory>             Memory Management Layer destroyed
+2023-10-31 10:01:28.119 [MOT] <TID:3520090/04088> <SID:-----/-----> [INFO]     <System>             Shutdown: Statistics module Destroyed
+2023-10-31 10:01:28.119 [MOT] <TID:3520090/-----> <SID:-----/-----> [INFO]     <System>             Shutdown: All core services Destroyed
+2023-10-31 10:01:28.119 [MOT] <TID:3520090/-----> <SID:-----/-----> [INFO]     <System>             Shutdown: Configuration module Destroyed
+2023-10-31 10:01:28.119 [MOT] <TID:3520090/-----> <SID:-----/-----> [INFO]     <System>             Shutdown: MOT Engine shutdown finished
+0 LOG:  [Alarm Module]can not read GAUSS_WARNING_TYPE env.
+	
+0 LOG:  [Alarm Module]Host Name: localhost.localdomain 
+	
+0 LOG:  [Alarm Module]Host IP: localhost.localdomain. Copy hostname directly in case of taking 10s to use 'gethostbyname' when /etc/hosts does not contain <HOST IP>
+	
+0 LOG:  [Alarm Module]Get ENV GS_CLUSTER_NAME failed!
+	
+0 LOG:  [Alarm Module]Invalid data in AlarmItem file! Read alarm English name failed! line: 57
+	
+0 WARNING:  failed to open feature control file, please check whether it exists: FileName=gaussdb.version, Errno=2, Errmessage=No such file or directory.
+0 WARNING:  failed to parse feature control file: gaussdb.version.
+0 WARNING:  Failed to load the product control file, so gaussdb cannot distinguish product version.
+0 LOG:  bbox_dump_path is set to /tmp/
+2023-10-31 10:10:28.750 [MOT] <TID:3531283/-----> <SID:-----/-----> [INFO]     <System>             Startup: Loading configuration from /opt/test/data/mot.conf
+2023-10-31 10:10:28.830 [MOT] <TID:3531283/-----> <SID:-----/-----> [INFO]     <Configuration>      Configuring total memory for relative memory values to: 12288 MB
+2023-10-31 10:10:28.831 [MOT] <TID:3531283/-----> <SID:-----/-----> [INFO]     <Configuration>      Loading max_connections from envelope into MOTEngine: 4096
+2023-10-31 10:10:28.831 [MOT] <TID:3531283/-----> <SID:-----/-----> [WARNING]  <Configuration>      Adjusted maximum number of threads to 4096 due to maximum limit
+2023-10-31 10:10:28.831 [MOT] <TID:3531283/-----> <SID:-----/-----> [INFO]     <Configuration>      Configuring synchronous redo-log handler
+2023-10-31 10:10:28.831 [MOT] <TID:3531283/-----> <SID:-----/-----> [WARNING]  <Configuration>      Adjusting MOT memory limits: global = 8623 MB, local = 1617 MB, session large store = 0 MB, total = 10240 MB
+2023-10-31 10:10:28.831 [MOT] <TID:3531283/-----> <SID:-----/-----> [INFO]     <Memory>             Global Memory Limit is configured to: 0 MB --> 8623 MB
+2023-10-31 10:10:28.831 [MOT] <TID:3531283/-----> <SID:-----/-----> [INFO]     <Memory>             Local Memory Limit is configured to: 0 MB --> 1617 MB
+2023-10-31 10:10:28.831 [MOT] <TID:3531283/-----> <SID:-----/-----> [INFO]     <Memory>             Session Memory Limit is configured to: 0 KB --> 0 KB (maximum 4096 sessions)
+2023-10-31 10:10:28.831 [MOT] <TID:3531283/-----> <SID:-----/-----> [INFO]     <Memory>             Configured automatic chunk allocation policy to 'CHUNK-INTERLEAVED' on 8 nodes NUMA machine in PRODUCTION mode
+2023-10-31 10:10:28.851 [MOT] <TID:3531283/-----> <SID:-----/-----> [WARNING]  <System>             NUMA policy in the system is set to automatic. (/proc/sys/kernel/numa_balancing is 1)
+2023-10-31 10:10:28.851 [MOT] <TID:3531283/-----> <SID:-----/-----> [INFO]     <System>             Startup: Affinity initialized - numaNodes = 8, coresPerCpu = 32, sessionAffinityMode = 1, taskAffinityMode = 1
+2023-10-31 10:10:28.993 [MOT] <TID:3531283/04088> <SID:-----/-----> [INFO]     <System>             Startup: All core services Initialized successfully
+2023-10-31 10:10:28.993 [MOT] <TID:3531283/04088> <SID:-----/-----> [INFO]     <RedoLog>            Using synchronous redo log handler
+2023-10-31 10:10:28.993 [MOT] <TID:3531283/04088> <SID:-----/-----> [INFO]     <Logger>             Using external logger
+2023-10-31 10:10:28.993 [MOT] <TID:3531283/04088> <SID:-----/-----> [INFO]     <System>             Startup: Redo-log handler initialized successfully
+2023-10-31 10:10:28.993 [MOT] <TID:3531283/04088> <SID:-----/-----> [INFO]     <Checkpoint>         CheckpointControlFile: init - a previous checkpoint was not found
+2023-10-31 10:10:28.993 [MOT] <TID:3531283/04088> <SID:-----/-----> [INFO]     <Recovery>           MTLSRecoveryManager: Initialized successfully
+2023-10-31 10:10:28.993 [MOT] <TID:3531283/04088> <SID:-----/-----> [INFO]     <System>             Startup: Recovery manager initialized successfully
+2023-10-31 10:10:28.993 [MOT] <TID:3531511/-----> <SID:-----/-----> [INFO]     <Checkpoint>         CheckpointWorker0 - Starting
+2023-10-31 10:10:28.994 [MOT] <TID:3531511/00000> <SID:00000/00000> [INFO]     <GC>                 GC PARAMS: 
+2023-10-31 10:10:28.994 [MOT] <TID:3531511/00000> <SID:00000/00000> [INFO]     <GC>                 QUEUE0:DELETE_QUEUE SizeLimit = 1KB, SizeLimitHigh = 8192KB, Count = 500
+2023-10-31 10:10:28.994 [MOT] <TID:3531511/00000> <SID:00000/00000> [INFO]     <GC>                 QUEUE1:VERSION_QUEUE SizeLimit = 100KB, SizeLimitHigh = 8192KB, Count = 1000
+2023-10-31 10:10:28.994 [MOT] <TID:3531511/00000> <SID:00000/00000> [INFO]     <GC>                 QUEUE2:UPDATE_COLUMN_QUEUE SizeLimit = 0KB, SizeLimitHigh = 8192KB, Count = 100000
+2023-10-31 10:10:28.994 [MOT] <TID:3531511/00000> <SID:00000/00000> [INFO]     <GC>                 QUEUE3:GENERIC_QUEUE SizeLimit = 100KB, SizeLimitHigh = 8192KB, Count = 1000
+2023-10-31 10:10:28.996 [MOT] <TID:3531512/-----> <SID:-----/-----> [INFO]     <Checkpoint>         CheckpointWorker1 - Starting
+2023-10-31 10:10:28.997 [MOT] <TID:3531513/-----> <SID:-----/-----> [INFO]     <Checkpoint>         CheckpointWorker2 - Starting
+2023-10-31 10:10:28.998 [MOT] <TID:3531283/04088> <SID:-----/-----> [INFO]     <System>             Startup: Checkpoint manager initialized successfully
+2023-10-31 10:10:28.998 [MOT] <TID:3531283/04088> <SID:-----/-----> [INFO]     <System>             Startup: MOT Engine initialization finished successfully
+2023-10-31 10:10:28.998 [MOT] <TID:3531283/04088> <SID:-----/-----> [INFO]     <FDW>                Switching to External snapshot manager
+2023-10-31 10:10:28.998 [MOT] <TID:3531283/04088> <SID:-----/-----> [INFO]     <JitExec>            MOT JIT execution is disabled by user configuration
+2023-10-31 10:10:31.722 [MOT] <TID:3531514/00003> <SID:00003/00003> [INFO]     <Recovery>           Starting MOT recovery
+2023-10-31 10:10:31.722 [MOT] <TID:3531514/00003> <SID:00003/00003> [INFO]     <FDW>                Registered current thread for proc-exit callback for thread 0x7fb64b7ff640
+2023-10-31 10:31:32.634 [MOT] <TID:3531514/00003> <SID:00003/00003> [INFO]     <Recovery>           RecoverDbEnd: Recovery finished successfully (CSN: 0, TxnId: 0)
+2023-10-31 10:31:32.634 [MOT] <TID:3531514/-----> <SID:-----/-----> [WARNING]  <FDW>                Ignoring request to delete session context: already deleted
+2023-10-31 10:31:32.634 [MOT] <TID:3531514/-----> <SID:-----/-----> [WARNING]  <System>             Ignoring attempt to cleanup current thread with invalid thread identifier: 65535
+2023-10-31 10:31:32.635  [postmaster][reaper][140679133196608] LOG: startupprocess exit
+2023-10-31 10:31:32.739  [postmaster][reaper][140679133196608] LOG: update gaussdb state file: db state(NORMAL_STATE), server mode(Normal)
+2023-10-31 10:31:32.739  [postmaster][reaper][140679133196608] LOG: database system is ready to accept connections
+0 LOG:  [Alarm Module]can not read GAUSS_WARNING_TYPE env.
+	
+0 LOG:  [Alarm Module]Host Name: localhost.localdomain 
+	
+0 LOG:  [Alarm Module]Host IP: localhost.localdomain. Copy hostname directly in case of taking 10s to use 'gethostbyname' when /etc/hosts does not contain <HOST IP>
+	
+0 LOG:  [Alarm Module]Get ENV GS_CLUSTER_NAME failed!
+	
+0 LOG:  [Alarm Module]Invalid data in AlarmItem file! Read alarm English name failed! line: 57
+	
+0 WARNING:  failed to open feature control file, please check whether it exists: FileName=gaussdb.version, Errno=2, Errmessage=No such file or directory.
+0 WARNING:  failed to parse feature control file: gaussdb.version.
+0 WARNING:  Failed to load the product control file, so gaussdb cannot distinguish product version.
+0 LOG:  bbox_dump_path is set to /tmp/
+2023-11-01 01:56:56.701 [MOT] <TID:288236/-----> <SID:-----/-----> [INFO]     <System>             Startup: Loading configuration from /opt/test/data/mot.conf
+2023-11-01 01:56:56.793 [MOT] <TID:288236/-----> <SID:-----/-----> [INFO]     <Configuration>      Configuring total memory for relative memory values to: 12288 MB
+2023-11-01 01:56:56.793 [MOT] <TID:288236/-----> <SID:-----/-----> [INFO]     <Configuration>      Loading max_connections from envelope into MOTEngine: 4096
+2023-11-01 01:56:56.793 [MOT] <TID:288236/-----> <SID:-----/-----> [WARNING]  <Configuration>      Adjusted maximum number of threads to 4096 due to maximum limit
+2023-11-01 01:56:56.793 [MOT] <TID:288236/-----> <SID:-----/-----> [INFO]     <Configuration>      Configuring synchronous redo-log handler
+2023-11-01 01:56:56.793 [MOT] <TID:288236/-----> <SID:-----/-----> [WARNING]  <Configuration>      Adjusting MOT memory limits: global = 8623 MB, local = 1617 MB, session large store = 0 MB, total = 10240 MB
+2023-11-01 01:56:56.793 [MOT] <TID:288236/-----> <SID:-----/-----> [INFO]     <Memory>             Global Memory Limit is configured to: 0 MB --> 8623 MB
+2023-11-01 01:56:56.793 [MOT] <TID:288236/-----> <SID:-----/-----> [INFO]     <Memory>             Local Memory Limit is configured to: 0 MB --> 1617 MB
+2023-11-01 01:56:56.793 [MOT] <TID:288236/-----> <SID:-----/-----> [INFO]     <Memory>             Session Memory Limit is configured to: 0 KB --> 0 KB (maximum 4096 sessions)
+2023-11-01 01:56:56.793 [MOT] <TID:288236/-----> <SID:-----/-----> [INFO]     <Memory>             Configured automatic chunk allocation policy to 'CHUNK-INTERLEAVED' on 8 nodes NUMA machine in PRODUCTION mode
+2023-11-01 01:56:56.813 [MOT] <TID:288236/-----> <SID:-----/-----> [WARNING]  <System>             NUMA policy in the system is set to automatic. (/proc/sys/kernel/numa_balancing is 1)
+2023-11-01 01:56:56.813 [MOT] <TID:288236/-----> <SID:-----/-----> [INFO]     <System>             Startup: Affinity initialized - numaNodes = 8, coresPerCpu = 32, sessionAffinityMode = 1, taskAffinityMode = 1
+2023-11-01 01:56:56.943 [MOT] <TID:288236/04088> <SID:-----/-----> [INFO]     <System>             Startup: All core services Initialized successfully
+2023-11-01 01:56:56.943 [MOT] <TID:288236/04088> <SID:-----/-----> [INFO]     <RedoLog>            Using synchronous redo log handler
+2023-11-01 01:56:56.943 [MOT] <TID:288236/04088> <SID:-----/-----> [INFO]     <Logger>             Using external logger
+2023-11-01 01:56:56.943 [MOT] <TID:288236/04088> <SID:-----/-----> [INFO]     <System>             Startup: Redo-log handler initialized successfully
+2023-11-01 01:56:56.943 [MOT] <TID:288236/04088> <SID:-----/-----> [INFO]     <Checkpoint>         CheckpointControlFile: init - a previous checkpoint was not found
+2023-11-01 01:56:56.943 [MOT] <TID:288236/04088> <SID:-----/-----> [INFO]     <Recovery>           MTLSRecoveryManager: Initialized successfully
+2023-11-01 01:56:56.943 [MOT] <TID:288236/04088> <SID:-----/-----> [INFO]     <System>             Startup: Recovery manager initialized successfully
+2023-11-01 01:56:56.943 [MOT] <TID:288730/-----> <SID:-----/-----> [INFO]     <Checkpoint>         CheckpointWorker0 - Starting
+2023-11-01 01:56:56.944 [MOT] <TID:288730/00000> <SID:00000/00000> [INFO]     <GC>                 GC PARAMS: 
+2023-11-01 01:56:56.944 [MOT] <TID:288730/00000> <SID:00000/00000> [INFO]     <GC>                 QUEUE0:DELETE_QUEUE SizeLimit = 1KB, SizeLimitHigh = 8192KB, Count = 500
+2023-11-01 01:56:56.944 [MOT] <TID:288730/00000> <SID:00000/00000> [INFO]     <GC>                 QUEUE1:VERSION_QUEUE SizeLimit = 100KB, SizeLimitHigh = 8192KB, Count = 1000
+2023-11-01 01:56:56.944 [MOT] <TID:288730/00000> <SID:00000/00000> [INFO]     <GC>                 QUEUE2:UPDATE_COLUMN_QUEUE SizeLimit = 0KB, SizeLimitHigh = 8192KB, Count = 100000
+2023-11-01 01:56:56.944 [MOT] <TID:288730/00000> <SID:00000/00000> [INFO]     <GC>                 QUEUE3:GENERIC_QUEUE SizeLimit = 100KB, SizeLimitHigh = 8192KB, Count = 1000
+2023-11-01 01:56:56.946 [MOT] <TID:288731/-----> <SID:-----/-----> [INFO]     <Checkpoint>         CheckpointWorker1 - Starting
+2023-11-01 01:56:56.947 [MOT] <TID:288732/-----> <SID:-----/-----> [INFO]     <Checkpoint>         CheckpointWorker2 - Starting
+2023-11-01 01:56:56.948 [MOT] <TID:288236/04088> <SID:-----/-----> [INFO]     <System>             Startup: Checkpoint manager initialized successfully
+2023-11-01 01:56:56.948 [MOT] <TID:288236/04088> <SID:-----/-----> [INFO]     <System>             Startup: MOT Engine initialization finished successfully
+2023-11-01 01:56:56.948 [MOT] <TID:288236/04088> <SID:-----/-----> [INFO]     <FDW>                Switching to External snapshot manager
+2023-11-01 01:56:56.948 [MOT] <TID:288236/04088> <SID:-----/-----> [INFO]     <JitExec>            MOT JIT execution is disabled by user configuration
+2023-11-01 01:56:58.402 [MOT] <TID:288733/00003> <SID:00003/00003> [INFO]     <Recovery>           Starting MOT recovery
+2023-11-01 01:56:58.402 [MOT] <TID:288733/00003> <SID:00003/00003> [INFO]     <FDW>                Registered current thread for proc-exit callback for thread 0x7f0a359ff640
+ 0 [BACKEND] PANIC:  stuck spinlock detected at bufmgr.cpp:7047
+ 0 [BACKEND] CONTEXT:  xlog redo XLOG_HEAP_INSERT insert: off 55
+ 0 [BACKEND] BACKTRACELOG:  tid[288733]'s backtrace:
+	/opt/gs_buffer/install_dest/bin/gaussdb(+0xdece9b) [0x561dc5911e9b]
+	/opt/gs_buffer/install_dest/bin/gaussdb(_Z9errfinishiz+0x58b) [0x561dc590962b]
+	/opt/gs_buffer/install_dest/bin/gaussdb(_Z18perform_spin_delayP15SpinDelayStatus+0x115) [0x561dc65dbf95]
+	/opt/gs_buffer/install_dest/bin/gaussdb(_Z9PinBufferP10BufferDescP24BufferAccessStrategyData+0x118) [0x561dc6537e88]
+	/opt/gs_buffer/install_dest/bin/gaussdb(+0x1a1e2bf) [0x561dc65432bf]
+	/opt/gs_buffer/install_dest/bin/gaussdb(_Z17ReadBuffer_commonP16SMgrRelationDatacij14ReadBufferModeP24BufferAccessStrategyDataPbPK12XLogPhyBlock+0x487) [0x561dc6543af7]
+	/opt/gs_buffer/install_dest/bin/gaussdb(_Z25ReadBufferWithoutRelcacheRK11RelFileNodeij14ReadBufferModeP24BufferAccessStrategyDataPK12XLogPhyBlock+0x4e) [0x561dc6544abe]
+	/opt/gs_buffer/install_dest/bin/gaussdb(_Z33XLogReadBufferExtendedForHeapDiskRK11RelFileNodeij14ReadBufferModePK12XLogPhyBlockb+0x17f) [0x561dc636959f]
+	/opt/gs_buffer/install_dest/bin/gaussdb(_Z32XLogReadBufferForRedoBlockExtendP13RedoBufferTag14ReadBufferModebP14RedoBufferInfommb16ReadBufferMethodb+0x78) [0x561dc636a138]
+	/opt/gs_buffer/install_dest/bin/gaussdb(_Z29XLogReadBufferForRedoExtendedP15XLogReaderStateh14ReadBufferModebP14RedoBufferInfo16ReadBufferMethod+0x100) [0x561dc636a5b0]
+	/opt/gs_buffer/install_dest/bin/gaussdb(_Z9heap_redoP15XLogReaderState+0x271) [0x561dc62424d1]
+	/opt/gs_buffer/install_dest/bin/gaussdb(_Z15ApplyRedoRecordP15XLogReaderState+0x66) [0x561dc6308146]
+	/opt/gs_buffer/install_dest/bin/gaussdb(_Z18DispatchRedoRecordP15XLogReaderStateP4Listl+0x64) [0x561dc63081e4]
+	/opt/gs_buffer/install_dest/bin/gaussdb(_Z11StartupXLOGv+0x2f03) [0x561dc6348d73]
+	/opt/gs_buffer/install_dest/bin/gaussdb(_Z18StartupProcessMainv+0x299) [0x561dc5e8b929]
+	/opt/gs_buffer/install_dest/bin/gaussdb(_Z17GaussDbThreadMainIL15knl_thread_role24EEiP14knl_thread_arg+0x3bb) [0x561dc5e7ba4b]
+	/opt/gs_buffer/install_dest/bin/gaussdb(+0x132fa15) [0x561dc5e54a15]
+	/usr/lib64/libc.so.6(+0x8b31a) [0x7f465386e31a]
+	/usr/lib64/libc.so.6(+0x10df10) [0x7f46538f0f10]
+	Use addr2line to get pretty function name and line
+	
+0 LOG:  [Alarm Module]can not read GAUSS_WARNING_TYPE env.
+	
+0 LOG:  [Alarm Module]Host Name: localhost.localdomain 
+	
+0 LOG:  [Alarm Module]Host IP: localhost.localdomain. Copy hostname directly in case of taking 10s to use 'gethostbyname' when /etc/hosts does not contain <HOST IP>
+	
+0 LOG:  [Alarm Module]Get ENV GS_CLUSTER_NAME failed!
+	
+0 LOG:  [Alarm Module]Invalid data in AlarmItem file! Read alarm English name failed! line: 57
+	
+0 WARNING:  failed to open feature control file, please check whether it exists: FileName=gaussdb.version, Errno=2, Errmessage=No such file or directory.
+0 WARNING:  failed to parse feature control file: gaussdb.version.
+0 WARNING:  Failed to load the product control file, so gaussdb cannot distinguish product version.
+0 LOG:  bbox_dump_path is set to /tmp/
+ 0 [BACKEND] FATAL:  could not lock file "postmaster.pid.lock": Resource temporarily unavailable
+0 LOG:  [Alarm Module]can not read GAUSS_WARNING_TYPE env.
+	
+0 LOG:  [Alarm Module]Host Name: localhost.localdomain 
+	
+0 LOG:  [Alarm Module]Host IP: localhost.localdomain. Copy hostname directly in case of taking 10s to use 'gethostbyname' when /etc/hosts does not contain <HOST IP>
+	
+0 LOG:  [Alarm Module]Get ENV GS_CLUSTER_NAME failed!
+	
+0 LOG:  [Alarm Module]Invalid data in AlarmItem file! Read alarm English name failed! line: 57
+	
+0 WARNING:  failed to open feature control file, please check whether it exists: FileName=gaussdb.version, Errno=2, Errmessage=No such file or directory.
+0 WARNING:  failed to parse feature control file: gaussdb.version.
+0 WARNING:  Failed to load the product control file, so gaussdb cannot distinguish product version.
+0 LOG:  bbox_dump_path is set to /tmp/
+2023-11-02 22:47:01.720 [MOT] <TID:507164/-----> <SID:-----/-----> [INFO]     <System>             Startup: Loading configuration from /opt/test/data/mot.conf
+2023-11-02 22:47:01.815 [MOT] <TID:507164/-----> <SID:-----/-----> [INFO]     <Configuration>      Configuring total memory for relative memory values to: 12288 MB
+2023-11-02 22:47:01.815 [MOT] <TID:507164/-----> <SID:-----/-----> [INFO]     <Configuration>      Loading max_connections from envelope into MOTEngine: 4096
+2023-11-02 22:47:01.815 [MOT] <TID:507164/-----> <SID:-----/-----> [WARNING]  <Configuration>      Adjusted maximum number of threads to 4096 due to maximum limit
+2023-11-02 22:47:01.815 [MOT] <TID:507164/-----> <SID:-----/-----> [INFO]     <Configuration>      Configuring synchronous redo-log handler
+2023-11-02 22:47:01.815 [MOT] <TID:507164/-----> <SID:-----/-----> [WARNING]  <Configuration>      Adjusting MOT memory limits: global = 8623 MB, local = 1617 MB, session large store = 0 MB, total = 10240 MB
+2023-11-02 22:47:01.816 [MOT] <TID:507164/-----> <SID:-----/-----> [INFO]     <Memory>             Global Memory Limit is configured to: 0 MB --> 8623 MB
+2023-11-02 22:47:01.816 [MOT] <TID:507164/-----> <SID:-----/-----> [INFO]     <Memory>             Local Memory Limit is configured to: 0 MB --> 1617 MB
+2023-11-02 22:47:01.816 [MOT] <TID:507164/-----> <SID:-----/-----> [INFO]     <Memory>             Session Memory Limit is configured to: 0 KB --> 0 KB (maximum 4096 sessions)
+2023-11-02 22:47:01.816 [MOT] <TID:507164/-----> <SID:-----/-----> [INFO]     <Memory>             Configured automatic chunk allocation policy to 'CHUNK-INTERLEAVED' on 8 nodes NUMA machine in PRODUCTION mode
+2023-11-02 22:47:01.836 [MOT] <TID:507164/-----> <SID:-----/-----> [WARNING]  <System>             NUMA policy in the system is set to automatic. (/proc/sys/kernel/numa_balancing is 1)
+2023-11-02 22:47:01.836 [MOT] <TID:507164/-----> <SID:-----/-----> [INFO]     <System>             Startup: Affinity initialized - numaNodes = 8, coresPerCpu = 32, sessionAffinityMode = 1, taskAffinityMode = 1
+2023-11-02 22:47:01.969 [MOT] <TID:507164/04088> <SID:-----/-----> [INFO]     <System>             Startup: All core services Initialized successfully
+2023-11-02 22:47:01.969 [MOT] <TID:507164/04088> <SID:-----/-----> [INFO]     <RedoLog>            Using synchronous redo log handler
+2023-11-02 22:47:01.969 [MOT] <TID:507164/04088> <SID:-----/-----> [INFO]     <Logger>             Using external logger
+2023-11-02 22:47:01.969 [MOT] <TID:507164/04088> <SID:-----/-----> [INFO]     <System>             Startup: Redo-log handler initialized successfully
+2023-11-02 22:47:01.969 [MOT] <TID:507164/04088> <SID:-----/-----> [INFO]     <Checkpoint>         CheckpointControlFile: init - a previous checkpoint was not found
+2023-11-02 22:47:01.969 [MOT] <TID:507164/04088> <SID:-----/-----> [INFO]     <Recovery>           MTLSRecoveryManager: Initialized successfully
+2023-11-02 22:47:01.969 [MOT] <TID:507164/04088> <SID:-----/-----> [INFO]     <System>             Startup: Recovery manager initialized successfully
+2023-11-02 22:47:01.970 [MOT] <TID:507395/-----> <SID:-----/-----> [INFO]     <Checkpoint>         CheckpointWorker0 - Starting
+2023-11-02 22:47:01.970 [MOT] <TID:507395/00000> <SID:00000/00000> [INFO]     <GC>                 GC PARAMS: 
+2023-11-02 22:47:01.970 [MOT] <TID:507395/00000> <SID:00000/00000> [INFO]     <GC>                 QUEUE0:DELETE_QUEUE SizeLimit = 1KB, SizeLimitHigh = 8192KB, Count = 500
+2023-11-02 22:47:01.970 [MOT] <TID:507395/00000> <SID:00000/00000> [INFO]     <GC>                 QUEUE1:VERSION_QUEUE SizeLimit = 100KB, SizeLimitHigh = 8192KB, Count = 1000
+2023-11-02 22:47:01.970 [MOT] <TID:507395/00000> <SID:00000/00000> [INFO]     <GC>                 QUEUE2:UPDATE_COLUMN_QUEUE SizeLimit = 0KB, SizeLimitHigh = 8192KB, Count = 100000
+2023-11-02 22:47:01.970 [MOT] <TID:507395/00000> <SID:00000/00000> [INFO]     <GC>                 QUEUE3:GENERIC_QUEUE SizeLimit = 100KB, SizeLimitHigh = 8192KB, Count = 1000
+2023-11-02 22:47:01.972 [MOT] <TID:507396/-----> <SID:-----/-----> [INFO]     <Checkpoint>         CheckpointWorker1 - Starting
+2023-11-02 22:47:01.973 [MOT] <TID:507397/-----> <SID:-----/-----> [INFO]     <Checkpoint>         CheckpointWorker2 - Starting
+2023-11-02 22:47:01.974 [MOT] <TID:507164/04088> <SID:-----/-----> [INFO]     <System>             Startup: Checkpoint manager initialized successfully
+2023-11-02 22:47:01.974 [MOT] <TID:507164/04088> <SID:-----/-----> [INFO]     <System>             Startup: MOT Engine initialization finished successfully
+2023-11-02 22:47:01.974 [MOT] <TID:507164/04088> <SID:-----/-----> [INFO]     <FDW>                Switching to External snapshot manager
+2023-11-02 22:47:01.974 [MOT] <TID:507164/04088> <SID:-----/-----> [INFO]     <JitExec>            MOT JIT execution is disabled by user configuration
+2023-11-02 22:47:02.727 [MOT] <TID:507398/00003> <SID:00003/00003> [INFO]     <Recovery>           Starting MOT recovery
+2023-11-02 22:47:02.727 [MOT] <TID:507398/00003> <SID:00003/00003> [INFO]     <FDW>                Registered current thread for proc-exit callback for thread 0x7f21c3fff640
+2023-11-02 22:47:02.846 [MOT] <TID:507398/00003> <SID:00003/00003> [INFO]     <Recovery>           RecoverDbEnd: Recovery finished successfully (CSN: 0, TxnId: 0)
+2023-11-02 22:47:02.846 [MOT] <TID:507398/-----> <SID:-----/-----> [WARNING]  <FDW>                Ignoring request to delete session context: already deleted
+2023-11-02 22:47:02.846 [MOT] <TID:507398/-----> <SID:-----/-----> [WARNING]  <System>             Ignoring attempt to cleanup current thread with invalid thread identifier: 65535
+2023-11-02 22:47:02.846  [postmaster][reaper][140041199051008] LOG: startupprocess exit
+2023-11-02 22:47:02.954  [postmaster][reaper][140041199051008] LOG: update gaussdb state file: db state(NORMAL_STATE), server mode(Normal)
+2023-11-02 22:47:02.954  [postmaster][reaper][140041199051008] LOG: database system is ready to accept connections
+ 0 [BACKEND] FATAL:  terminating txnsnapcapturer process due to administrator command
+ 0 [BACKEND] FATAL:  terminating autovacuum process due to administrator command
+ 0 [BACKEND] FATAL:  terminating autovacuum process due to administrator command
+ 0 [BACKEND] FATAL:  terminating autovacuum process due to administrator command
+2023-11-02 23:36:48.381  [postmaster][reaper][140041199051008] WARNING: Did not found reaper thread id 139783263221312 in backend list, with 0 thread still alive,last thread role 0, may has leak occurs
+2023-11-02 23:36:48.383  [postmaster][reaper][140041199051008] LOG: txnsnapcapturer process (ThreadId 139783292511808) exited with exit code 0Failed process was running: (null)
+2023-11-02 23:41:04.971  [postmaster][reaper][140041199051008] LOG: checkpoint thread exit and nowait for sharestorage
+2023-11-02 23:41:04.973 [MOT] <TID:507164/04088> <SID:-----/-----> [INFO]     <System>             Shutdown: Shutting down MOT Engine
+2023-11-02 23:41:04.973 [MOT] <TID:507164/04088> <SID:-----/-----> [INFO]     <System>             Shutdown: All background tasks stopped
+2023-11-02 23:41:04.973 [MOT] <TID:507164/04088> <SID:-----/-----> [INFO]     <System>             Destroying the Checkpoint Manager
+2023-11-02 23:41:04.975 [MOT] <TID:507397/-----> <SID:-----/-----> [INFO]     <Checkpoint>         CheckpointWorker2 - Exiting
+2023-11-02 23:41:04.975 [MOT] <TID:507395/-----> <SID:-----/-----> [INFO]     <Checkpoint>         CheckpointWorker0 - Exiting
+2023-11-02 23:41:04.975 [MOT] <TID:507396/-----> <SID:-----/-----> [INFO]     <Checkpoint>         CheckpointWorker1 - Exiting
+2023-11-02 23:41:04.976 [MOT] <TID:507164/04088> <SID:-----/-----> [INFO]     <System>             Destroying the Recovery Manager
+2023-11-02 23:41:04.976 [MOT] <TID:507164/04088> <SID:-----/-----> [INFO]     <System>             Destroying the Redo Log Handler
+2023-11-02 23:41:04.976 [MOT] <TID:507164/04088> <SID:-----/-----> [INFO]     <System>             Shutdown: All tables cleared
+2023-11-02 23:41:04.976 [MOT] <TID:507164/04088> <SID:-----/-----> [INFO]     <System>             Shutdown: Key surrogate manager destroyed
+2023-11-02 23:41:04.976 [MOT] <TID:507164/04088> <SID:-----/-----> [INFO]     <System>             Shutdown: Table manager destroyed
+2023-11-02 23:41:04.976 [MOT] <TID:507164/04088> <SID:-----/-----> [INFO]     <System>             Shutdown: Session manager destroyed
+2023-11-02 23:41:04.976 [MOT] <TID:507164/04088> <SID:-----/-----> [INFO]     <Memory>             Kernel allocation MM Layer Pre-Shutdown Report report:
+  NUMA Interleaved memory usage: Current = 1 MB, Peak = 1 MB
+  NUMA Local memory usage: Current = 332 MB, Peak = 352 MB
+
+2023-11-02 23:41:05.013 [MOT] <TID:507164/04088> <SID:-----/-----> [INFO]     <Memory>             Huge memory: 0 MB Used, 0 MB Requested, 0 objects
+
+2023-11-02 23:41:05.014 [MOT] <TID:507164/04088> <SID:-----/-----> [INFO]     <Memory>             Kernel allocation MM Layer Post-Shutdown Report report:
+  NUMA Interleaved memory usage: Current = 0 MB, Peak = 1 MB
+  NUMA Local memory usage: Current = 0 MB, Peak = 352 MB
+
+2023-11-02 23:41:05.014 [MOT] <TID:507164/04088> <SID:-----/-----> [INFO]     <Memory>             Memory Management Layer destroyed
+2023-11-02 23:41:05.014 [MOT] <TID:507164/04088> <SID:-----/-----> [INFO]     <System>             Shutdown: Statistics module Destroyed
+2023-11-02 23:41:05.014 [MOT] <TID:507164/-----> <SID:-----/-----> [INFO]     <System>             Shutdown: All core services Destroyed
+2023-11-02 23:41:05.014 [MOT] <TID:507164/-----> <SID:-----/-----> [INFO]     <System>             Shutdown: Configuration module Destroyed
+2023-11-02 23:41:05.014 [MOT] <TID:507164/-----> <SID:-----/-----> [INFO]     <System>             Shutdown: MOT Engine shutdown finished
+0 LOG:  [Alarm Module]can not read GAUSS_WARNING_TYPE env.
+	
+0 LOG:  [Alarm Module]Host Name: localhost.localdomain 
+	
+0 LOG:  [Alarm Module]Host IP: localhost.localdomain. Copy hostname directly in case of taking 10s to use 'gethostbyname' when /etc/hosts does not contain <HOST IP>
+	
+0 LOG:  [Alarm Module]Get ENV GS_CLUSTER_NAME failed!
+	
+0 LOG:  [Alarm Module]Invalid data in AlarmItem file! Read alarm English name failed! line: 57
+	
+0 WARNING:  failed to open feature control file, please check whether it exists: FileName=gaussdb.version, Errno=2, Errmessage=No such file or directory.
+0 WARNING:  failed to parse feature control file: gaussdb.version.
+0 WARNING:  Failed to load the product control file, so gaussdb cannot distinguish product version.
+0 LOG:  bbox_dump_path is set to /tmp/
+2023-11-12 12:41:58.666 [MOT] <TID:889806/-----> <SID:-----/-----> [INFO]     <System>             Startup: Loading configuration from /opt/test/data/mot.conf
+2023-11-12 12:41:58.755 [MOT] <TID:889806/-----> <SID:-----/-----> [INFO]     <Configuration>      Configuring total memory for relative memory values to: 12288 MB
+2023-11-12 12:41:58.756 [MOT] <TID:889806/-----> <SID:-----/-----> [INFO]     <Configuration>      Loading max_connections from envelope into MOTEngine: 4096
+2023-11-12 12:41:58.756 [MOT] <TID:889806/-----> <SID:-----/-----> [WARNING]  <Configuration>      Adjusted maximum number of threads to 4096 due to maximum limit
+2023-11-12 12:41:58.756 [MOT] <TID:889806/-----> <SID:-----/-----> [INFO]     <Configuration>      Configuring synchronous redo-log handler
+2023-11-12 12:41:58.756 [MOT] <TID:889806/-----> <SID:-----/-----> [WARNING]  <Configuration>      Adjusting MOT memory limits: global = 8623 MB, local = 1617 MB, session large store = 0 MB, total = 10240 MB
+2023-11-12 12:41:58.756 [MOT] <TID:889806/-----> <SID:-----/-----> [INFO]     <Memory>             Global Memory Limit is configured to: 0 MB --> 8623 MB
+2023-11-12 12:41:58.756 [MOT] <TID:889806/-----> <SID:-----/-----> [INFO]     <Memory>             Local Memory Limit is configured to: 0 MB --> 1617 MB
+2023-11-12 12:41:58.756 [MOT] <TID:889806/-----> <SID:-----/-----> [INFO]     <Memory>             Session Memory Limit is configured to: 0 KB --> 0 KB (maximum 4096 sessions)
+2023-11-12 12:41:58.756 [MOT] <TID:889806/-----> <SID:-----/-----> [INFO]     <Memory>             Configured automatic chunk allocation policy to 'CHUNK-INTERLEAVED' on 8 nodes NUMA machine in PRODUCTION mode
+2023-11-12 12:41:58.776 [MOT] <TID:889806/-----> <SID:-----/-----> [WARNING]  <System>             NUMA policy in the system is set to automatic. (/proc/sys/kernel/numa_balancing is 1)
+2023-11-12 12:41:58.776 [MOT] <TID:889806/-----> <SID:-----/-----> [INFO]     <System>             Startup: Affinity initialized - numaNodes = 8, coresPerCpu = 32, sessionAffinityMode = 1, taskAffinityMode = 1
+2023-11-12 12:41:58.904 [MOT] <TID:889806/04088> <SID:-----/-----> [INFO]     <System>             Startup: All core services Initialized successfully
+2023-11-12 12:41:58.905 [MOT] <TID:889806/04088> <SID:-----/-----> [INFO]     <RedoLog>            Using synchronous redo log handler
+2023-11-12 12:41:58.905 [MOT] <TID:889806/04088> <SID:-----/-----> [INFO]     <Logger>             Using external logger
+2023-11-12 12:41:58.905 [MOT] <TID:889806/04088> <SID:-----/-----> [INFO]     <System>             Startup: Redo-log handler initialized successfully
+2023-11-12 12:41:58.905 [MOT] <TID:889806/04088> <SID:-----/-----> [INFO]     <Checkpoint>         CheckpointControlFile: init - a previous checkpoint was not found
+2023-11-12 12:41:58.905 [MOT] <TID:889806/04088> <SID:-----/-----> [INFO]     <Recovery>           MTLSRecoveryManager: Initialized successfully
+2023-11-12 12:41:58.905 [MOT] <TID:889806/04088> <SID:-----/-----> [INFO]     <System>             Startup: Recovery manager initialized successfully
+2023-11-12 12:41:58.905 [MOT] <TID:890035/-----> <SID:-----/-----> [INFO]     <Checkpoint>         CheckpointWorker0 - Starting
+2023-11-12 12:41:58.906 [MOT] <TID:890035/00000> <SID:00000/00000> [INFO]     <GC>                 GC PARAMS: 
+2023-11-12 12:41:58.906 [MOT] <TID:890035/00000> <SID:00000/00000> [INFO]     <GC>                 QUEUE0:DELETE_QUEUE SizeLimit = 1KB, SizeLimitHigh = 8192KB, Count = 500
+2023-11-12 12:41:58.906 [MOT] <TID:890035/00000> <SID:00000/00000> [INFO]     <GC>                 QUEUE1:VERSION_QUEUE SizeLimit = 100KB, SizeLimitHigh = 8192KB, Count = 1000
+2023-11-12 12:41:58.906 [MOT] <TID:890035/00000> <SID:00000/00000> [INFO]     <GC>                 QUEUE2:UPDATE_COLUMN_QUEUE SizeLimit = 0KB, SizeLimitHigh = 8192KB, Count = 100000
+2023-11-12 12:41:58.906 [MOT] <TID:890035/00000> <SID:00000/00000> [INFO]     <GC>                 QUEUE3:GENERIC_QUEUE SizeLimit = 100KB, SizeLimitHigh = 8192KB, Count = 1000
+2023-11-12 12:41:58.907 [MOT] <TID:890036/-----> <SID:-----/-----> [INFO]     <Checkpoint>         CheckpointWorker1 - Starting
+2023-11-12 12:41:58.908 [MOT] <TID:890037/-----> <SID:-----/-----> [INFO]     <Checkpoint>         CheckpointWorker2 - Starting
+2023-11-12 12:41:58.909 [MOT] <TID:889806/04088> <SID:-----/-----> [INFO]     <System>             Startup: Checkpoint manager initialized successfully
+2023-11-12 12:41:58.909 [MOT] <TID:889806/04088> <SID:-----/-----> [INFO]     <System>             Startup: MOT Engine initialization finished successfully
+2023-11-12 12:41:58.909 [MOT] <TID:889806/04088> <SID:-----/-----> [INFO]     <FDW>                Switching to External snapshot manager
+2023-11-12 12:41:58.909 [MOT] <TID:889806/04088> <SID:-----/-----> [INFO]     <JitExec>            MOT JIT execution is disabled by user configuration
+2023-11-12 12:42:00.773 [MOT] <TID:890038/00003> <SID:00003/00003> [INFO]     <Recovery>           Starting MOT recovery
+2023-11-12 12:42:00.773 [MOT] <TID:890038/00003> <SID:00003/00003> [INFO]     <FDW>                Registered current thread for proc-exit callback for thread 0x7f040edff640
+2023-11-12 12:42:00.852 [MOT] <TID:890038/00003> <SID:00003/00003> [INFO]     <Recovery>           RecoverDbEnd: Recovery finished successfully (CSN: 0, TxnId: 0)
+2023-11-12 12:42:00.852 [MOT] <TID:890038/-----> <SID:-----/-----> [WARNING]  <FDW>                Ignoring request to delete session context: already deleted
+2023-11-12 12:42:00.852 [MOT] <TID:890038/-----> <SID:-----/-----> [WARNING]  <System>             Ignoring attempt to cleanup current thread with invalid thread identifier: 65535
+2023-11-12 12:42:00.852  [postmaster][reaper][139916142829824] LOG: startupprocess exit
+2023-11-12 12:42:00.959  [postmaster][reaper][139916142829824] LOG: update gaussdb state file: db state(NORMAL_STATE), server mode(Normal)
+2023-11-12 12:42:00.959  [postmaster][reaper][139916142829824] LOG: database system is ready to accept connections
+ 0 [BACKEND] FATAL:  terminating txnsnapcapturer process due to administrator command
+2023-11-12 14:42:22.88  [postmaster][reaper][139916142829824] WARNING: Did not found reaper thread id 139655638414912 in backend list, with 0 thread still alive,last thread role 0, may has leak occurs
+2023-11-12 14:42:22.92  [postmaster][reaper][139916142829824] LOG: txnsnapcapturer process (ThreadId 139655666726464) exited with exit code 0Failed process was running: (null)
+2023-11-12 14:42:23.670  [postmaster][reaper][139916142829824] LOG: checkpoint thread exit and nowait for sharestorage
+2023-11-12 14:42:23.675 [MOT] <TID:889806/04088> <SID:-----/-----> [INFO]     <System>             Shutdown: Shutting down MOT Engine
+2023-11-12 14:42:23.675 [MOT] <TID:889806/04088> <SID:-----/-----> [INFO]     <System>             Shutdown: All background tasks stopped
+2023-11-12 14:42:23.675 [MOT] <TID:889806/04088> <SID:-----/-----> [INFO]     <System>             Destroying the Checkpoint Manager
+2023-11-12 14:42:23.675 [MOT] <TID:890035/-----> <SID:-----/-----> [INFO]     <Checkpoint>         CheckpointWorker0 - Exiting
+2023-11-12 14:42:23.675 [MOT] <TID:890037/-----> <SID:-----/-----> [INFO]     <Checkpoint>         CheckpointWorker2 - Exiting
+2023-11-12 14:42:23.675 [MOT] <TID:890036/-----> <SID:-----/-----> [INFO]     <Checkpoint>         CheckpointWorker1 - Exiting
+2023-11-12 14:42:23.676 [MOT] <TID:889806/04088> <SID:-----/-----> [INFO]     <System>             Destroying the Recovery Manager
+2023-11-12 14:42:23.676 [MOT] <TID:889806/04088> <SID:-----/-----> [INFO]     <System>             Destroying the Redo Log Handler
+2023-11-12 14:42:23.676 [MOT] <TID:889806/04088> <SID:-----/-----> [INFO]     <System>             Shutdown: All tables cleared
+2023-11-12 14:42:23.676 [MOT] <TID:889806/04088> <SID:-----/-----> [INFO]     <System>             Shutdown: Key surrogate manager destroyed
+2023-11-12 14:42:23.676 [MOT] <TID:889806/04088> <SID:-----/-----> [INFO]     <System>             Shutdown: Table manager destroyed
+2023-11-12 14:42:23.676 [MOT] <TID:889806/04088> <SID:-----/-----> [INFO]     <System>             Shutdown: Session manager destroyed
+2023-11-12 14:42:23.676 [MOT] <TID:889806/04088> <SID:-----/-----> [INFO]     <Memory>             Kernel allocation MM Layer Pre-Shutdown Report report:
+  NUMA Interleaved memory usage: Current = 1 MB, Peak = 1 MB
+  NUMA Local memory usage: Current = 332 MB, Peak = 352 MB
+
+2023-11-12 14:42:23.707 [MOT] <TID:889806/04088> <SID:-----/-----> [INFO]     <Memory>             Huge memory: 0 MB Used, 0 MB Requested, 0 objects
+
+2023-11-12 14:42:23.707 [MOT] <TID:889806/04088> <SID:-----/-----> [INFO]     <Memory>             Kernel allocation MM Layer Post-Shutdown Report report:
+  NUMA Interleaved memory usage: Current = 0 MB, Peak = 1 MB
+  NUMA Local memory usage: Current = 0 MB, Peak = 352 MB
+
+2023-11-12 14:42:23.707 [MOT] <TID:889806/04088> <SID:-----/-----> [INFO]     <Memory>             Memory Management Layer destroyed
+2023-11-12 14:42:23.711 [MOT] <TID:889806/04088> <SID:-----/-----> [INFO]     <System>             Shutdown: Statistics module Destroyed
+2023-11-12 14:42:23.711 [MOT] <TID:889806/-----> <SID:-----/-----> [INFO]     <System>             Shutdown: All core services Destroyed
+2023-11-12 14:42:23.711 [MOT] <TID:889806/-----> <SID:-----/-----> [INFO]     <System>             Shutdown: Configuration module Destroyed
+2023-11-12 14:42:23.711 [MOT] <TID:889806/-----> <SID:-----/-----> [INFO]     <System>             Shutdown: MOT Engine shutdown finished

@@ -1,0 +1,433 @@
+<html>
+
+<head>
+    <meta charset="UTF-8" />
+    <title>Monitor</title>
+    <link rel="stylesheet" href="https://cdn.staticfile.net/twitter-bootstrap/3.3.7/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdn.staticfile.net/foundation/5.5.3/css/foundation.min.css">
+    <script src="https://cdn.staticfile.net/jquery/2.1.4/jquery.min.js"></script>
+    <script src="http://code.highcharts.com/highcharts.js"></script>
+    <script src="https://cdn.staticfile.net/twitter-bootstrap/3.3.7/js/bootstrap.min.js"></script>
+    <script src="https://cdn.staticfile.net/foundation/5.5.3/js/foundation.min.js"></script>
+    <script src="https://cdn.staticfile.net/foundation/5.5.3/js/vendor/modernizr.js"></script>
+    <style>
+        .myView {
+            display: flex;
+            justify-content: center;
+        }
+
+        .myinput {
+            width: 100%;
+            justify-content: left;
+            margin: 10px;
+            font-size: small;
+        }
+
+        .myinput label {
+            margin: 5px;
+            font-size: small;
+            display: inline-block;
+        }
+
+        .myinput input {
+            width: 80px;
+            height: 20px;
+            margin: 10px;
+            display: inline-block;
+        }
+
+        #container {
+            width: 50%;
+            float: left;
+            height: 650px;
+            margin: auto;
+            left: 2%;
+            top: 10%;
+            position: absolute;
+            /* background-color: black; */
+        }
+
+        #controller {
+            float: left;
+            width: 40%;
+            left: 55%;
+            top: 30%;
+            position: absolute;
+            border-style: dashed;
+            border-width: 3px;
+            padding: 10px;
+            /* background-color: red; */
+        }
+
+        #controller h3 {
+            text-align: center;
+            /* margin-left: 15px; */
+        }
+
+        .strictboard {
+            height: 25px;
+            margin: 15px;
+            justify-content: left;
+            width: 100%;
+            font-size: small;
+        }
+
+        .strictboard .stricttext {
+            height: 100%;
+            display: inline-block;
+            vertical-align: top;
+            margin-right: 20px; /* Adjust the value as needed */
+        }
+
+        .strictboard .strictswitch {
+            height: 100%;
+            display: inline-block;
+            vertical-align: top;
+        }
+
+        /* 圆形滑块 */
+
+        /* Switch开关样式 */
+        /* 必须是input为 checkbox class 添加 switch 才能实现以下效果 */
+        input[type='checkbox'].switch {
+            outline: none;
+            appearance: none;
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            position: relative;
+            width: 40px;
+            height: 20px;
+            background: #ccc;
+            border-radius: 10px;
+            transition: border-color .3s, background-color .3s;
+        }
+
+        input[type='checkbox'].switch::after {
+            content: '';
+            display: inline-block;
+            width: 1rem;
+            height: 1rem;
+            border-radius: 50%;
+            background: #fff;
+            box-shadow: 0, 0, 2px, #999;
+            transition: .4s;
+            top: 2px;
+            position: absolute;
+            left: 2px;
+        }
+
+        input[type='checkbox'].switch:checked {
+            background: rgb(19, 206, 102);
+        }
+
+        /* 当input[type=checkbox]被选中时：伪元素显示下面样式 位置发生变化 */
+        input[type='checkbox'].switch:checked::after {
+            content: '';
+            position: absolute;
+            left: 55%;
+            top: 2px;
+        }
+    </style>
+</head>
+<!-- 10 16384 16389 -->
+
+<body>
+    <div class="myView">
+        <div id="container"></div>
+        <div id="controller">
+            <div>
+                <h3>Controller</h3>
+            </div>
+            <div class="strictboard">
+                <div class="stricttext">
+                    <font>Strict Mode </font>
+                </div>
+                <div class="strictswitch">
+                    <input type="checkbox" class="switch" id="mySwitch3" checked>
+                </div>
+            </div>
+
+            <div>
+                <div class="myinput">
+                    <form name="set_user_buffer" method="get">
+                        <label>
+                            <font>设置用户</font>
+                        </label><input name="user" />
+                        <label>
+                            <font>的购买数为</font>
+                        </label><input name="number" />
+                        <input type="button" value="Query" style="font-size: small;" onclick="setUserBuffer()">
+                    </form>
+                </div>
+                <div class="myinput">
+                    <form name="get_user_buffer" method="get">
+                        <label>
+                            <font>查询用户</font>
+                        </label><input name="user" />
+                        <label>
+                            <font>的购买数</font>
+                        </label>
+                        <input type="button" value="提交" style="font-size: small;" onclick="getUserBuffer()">
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script language="JavaScript">
+        var chart = null, total = 0
+        var num = 1, myPath = 'http://172.18.166.156:8877/'
+        $(document).ready(function () {
+            getTotal();
+
+            $('#mySwitch3').change(function () {
+                if ($(this).is(':checked')) {
+                    // 开关打开时执行的操作
+                    openStrict();
+                } else {
+                    // 开关关闭时执行的操作
+                    closeStrict();
+                }
+            });
+
+            chart = Highcharts.chart('container', {
+                chart: {
+                    type: 'spline',
+                    animation: Highcharts.svg, // don't animate in IE < IE 10.
+                    marginRight: 10,
+                    events: {
+                        load: requestData
+                    }
+                },
+                boost: {
+                    useGPUTranslations: true
+                },
+                title: {
+                    text: '标题',
+                    style: {
+                        fontSize: '50px'
+                    }
+                },
+                xAxis: {
+                    type: 'datetime',
+                    tickPixelInterval: 150,
+                    labels: {
+                        enabled: false
+                    }
+                },
+                yAxis: {
+                    title: {
+                        text: '纵坐标',
+                        style: {
+                            fontSize: '20px'
+                        }
+                    },
+                    // min: 0,
+                    // max: 100,
+                    plotLines: [{
+                        value: 0,
+                        width: 1,
+                        color: '#808080'
+                    }]
+                },
+                tooltip: {
+                    formatter: function () {
+                        return '<b>' + this.series.name + '</b><br/>' +
+                            Highcharts.dateFormat('%Y-%m-%d %H:%M:%S', this.x) + '<br/>' +
+                            Highcharts.numberFormat(this.y, 2);
+                    }
+                },
+                plotOptions: {
+                    area: {
+                        pointStart: 1940,
+                        marker: {
+                            enabled: false,
+                            symbol: 'circle',
+                            radius: 2,
+                            states: {
+                                hover: {
+                                    enabled: true
+                                }
+                            }
+                        }
+                    },
+                    series: {
+                        animation: false
+                    }
+                },
+
+                legend: {
+                    enabled: true,
+                    labelFormatter: function () {
+                        return "用户" + this.name;
+                    },
+                    // layout: 'vertical',
+                    // align: 'right',
+                    // verticalAlign: 'bottom',
+                    borderWidth: 0,
+                    // // x: -20,
+                    // // y: 0
+                },
+                exporting: {
+                    enabled: false
+                },
+                series: [{
+                    name: '10',
+                    data: [],
+                    marker: {
+                        enabled: false
+                    }
+                }, {
+                    name: '16384',
+                    data: [],
+                    visible: false,
+                    marker: {
+                        enabled: false
+                    }
+                }, {
+                    name: '16389',
+                    data: [],
+                    visible: false,
+                    marker: {
+                        enabled: false
+                    }
+                }],
+                credits: {
+                    enabled: false
+                }
+            });
+
+            Highcharts.setOptions({
+                global: {
+                    useUTC: false
+                }
+            });
+
+        });
+
+        function requestData() {
+            $.ajax({
+                // url: 'http://172.18.166.156:8888/',
+                url: myPath,
+                type: 'GET',
+                success: function (point) {
+                    var x = (new Date()).getTime(), // current time
+                        n = chart.series.length
+                    n = point.data.users.length
+                    for (var i = 0; i < n; ++i) {
+                        var series = chart.series[i],
+                            len = series.data.length,
+                            shift = len > 30; // 当数据点数量超过 20 个，则指定删除第一个点
+
+                        for (var j = 0; j < len - 31; ++j) {
+                            series.removePoint(0, false, false)
+                        }
+
+                        // 新增点操作
+                        //具体的参数详见：https://api.hcharts.cn/highcharts#Series.addPoint
+
+                        // console.log('point: ', point.code, ' ', point.data, ' x: ', x)
+                        // y = Math.random() * 100;
+                        if (i == 0) {
+                            y = point.data.result1;
+                        } else if (i == 1) {
+                            y = point.data.result2;
+                        } else {
+                            y = point.data.result3;
+                        }
+                        // y = (y / total * 100).toFixed(3)
+                        y = +(y / total * 100).toFixed(4)
+                        // console.log(y, +(y / total * 100).toFixed(4), len)
+                        chart.series[i].addPoint({ x: x, y: y }, true, shift);
+                    }
+
+                    // 一秒后继续调用本函数
+                    setTimeout(requestData, 1000);
+                },
+                cache: false
+            });
+        }
+
+        function getTotal() {
+            $.ajax({
+                // url: 'http://172.18.166.156:8888/gettotal',
+                url: myPath + 'gettotal',
+                type: 'GET',
+                success: function (point) {
+                    console.log(point.data)
+                    total = point.data.result1
+                },
+                cache: false
+            });
+        }
+
+        function openStrict() {
+            $.ajax({
+                // url: 'http://172.18.166.156:8888/openStrict',
+                url: myPath + 'openStrict',
+                type: 'GET',
+                success: function (point) {
+                    console.log(point.data)
+                },
+                cache: false
+            });
+        }
+
+        function closeStrict() {
+            $.ajax({
+                // url: 'http://172.18.166.156:8888/closeStrict',
+                url: myPath + 'closeStrict',
+                type: 'GET',
+                success: function (point) {
+                    console.log(point.data)
+                },
+                cache: false
+            });
+        }
+
+        function setUserBuffer() {
+            if (set_user_buffer.user.value == "") {
+                alert("请输入用户ID！");
+                set_user_buffer.user.focus();
+                return;
+            } else if (set_user_buffer.number.value == "") {
+                alert("请输入购买数！")
+                set_user_buffer.number.focus();
+                return
+            }
+
+            $.ajax({
+                // url: 'http://172.18.166.156:8888/setUserBuffer',
+                url: myPath + 'setUserBuffer',
+                type: 'GET',
+                data: { 'user': set_user_buffer.user.value, 'number': set_user_buffer.number.value },
+                success: function (point) {
+                    console.log(point.data)
+                    alert("设置成功")
+                },
+                cache: false
+            });
+        }
+
+        function getUserBuffer() {
+            if (get_user_buffer.user.value == "") {
+                alert("请输入用户ID！");
+                get_user_buffer.user.focus();
+                return;
+            }
+            console.log(get_user_buffer.user.value)
+            $.ajax({
+                // url: 'http://172.18.166.156:8888/getUserBuffer',
+                url: myPath + 'getUserBuffer',
+                type: 'GET',
+                data: { 'user': get_user_buffer.user.value },
+                success: function (point) {
+                    console.log(point.data)
+                    alert('该用户的购买数为' + point.data.result1)
+                },
+                cache: false
+            });
+        }
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,723 @@
+<html>
+
+<head>
+    <meta charset="UTF-8" />
+    <title>Monitor</title>
+    <link rel="stylesheet" href="https://cdn.staticfile.net/twitter-bootstrap/3.3.7/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdn.staticfile.net/foundation/5.5.3/css/foundation.min.css">
+    <script src="https://cdn.staticfile.net/jquery/2.1.4/jquery.min.js"></script>
+    <script src="http://code.highcharts.com/highcharts.js"></script>
+    <script src="https://cdn.staticfile.net/twitter-bootstrap/3.3.7/js/bootstrap.min.js"></script>
+    <script src="https://cdn.staticfile.net/foundation/5.5.3/js/foundation.min.js"></script>
+    <script src="https://cdn.staticfile.net/foundation/5.5.3/js/vendor/modernizr.js"></script>
+    <link rel="stylesheet" type="text/css" src="select_style.css">
+
+    <style>
+        /* .myView {
+            display: flex;
+            justify-content: center;
+        } */
+
+        .myView {
+            position: relative; /* 相对定位 */
+            height: 100vh; /* 设置高度为视口高度 */
+            display: flex; /* 使用 Flex 布局 */
+        }
+
+        .myinput {
+            width: 100%;
+            justify-content: left;
+            margin: 10px;
+            font-size: small;
+        }
+
+        .myinput label {
+            margin: 5px;
+            font-size: small;
+            display: inline-block;
+        }
+
+        .myinput input {
+            width: 80px;
+            height: 20px;
+            margin: 10px;
+            display: inline-block;
+        }
+        .container {
+            position: relative; /* 相对定位 */
+            height: 100vh; /* 设置高度为视口高度 */
+            display: flex; /* 使用 Flex 布局 */
+        }
+
+
+        #controller h3 {
+            text-align: center;
+        } */
+
+        .strictboard {
+            height: auto;
+            margin: 15px;
+            justify-content: left;
+            width: 100%;
+            font-size: small;
+        }
+        .controlboard {
+            height: 25px;
+            margin: 15px;
+            justify-content: left;
+            width: 100%;
+            font-size: small;
+
+            /* display: flex */
+        }
+        .strictboard .stricttext {
+            height: auto;
+            display: inline-block;
+            /* vertical-align: top; */
+            margin-right: 10px; /* Adjust the value as needed */
+            margin-top: 10px;
+        }
+
+        .strictboard .strictswitch {
+            height: auto;
+            display: inline-block;
+            vertical-align: top;
+            margin-top: 10px;
+        }
+        .controlboard .updatetext {
+            height: 100%;
+            display: inline-block;
+            /* vertical-align: top; */
+            margin-right: 30px; /* Adjust the value as needed */
+        }
+
+        .controlboard .updateswitch {
+            height: 100%;
+            display: inline-block;
+            vertical-align: top;
+            margin-left: 6px;
+        }
+
+        /* 圆形滑块 */
+
+        /* Switch开关样式 */
+        /* 必须是input为 checkbox class 添加 switch 才能实现以下效果 */
+        input[type='checkbox'].switch {
+            outline: none;
+            appearance: none;
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            position: relative;
+            width: 40px;
+            height: 20px;
+            background: #ccc;
+            border-radius: 10px;
+            transition: border-color .3s, background-color .3s;
+        }
+
+        input[type='checkbox'].switch::after {
+            content: '';
+            display: inline-block;
+            width: 1rem;
+            height: 1rem;
+            border-radius: 50%;
+            background: #fff;
+            box-shadow: 0, 0, 2px, #999;
+            transition: .4s;
+            top: 2px;
+            position: absolute;
+            left: 2px;
+        }
+
+        input[type='checkbox'].switch:checked {
+            background: rgb(19, 206, 102);
+        }
+
+        /* 当input[type=checkbox]被选中时：伪元素显示下面样式 位置发生变化 */
+        input[type='checkbox'].switch:checked::after {
+            content: '';
+            position: absolute;
+            left: 55%;
+            top: 2px;
+        }
+        .options {
+        max-height: 200px;
+        max-width: 100px;
+        overflow-y: auto; /* 添加滚动条 */
+        }
+        .textbox {
+            border: 1px solid #ccc; /* 边框 */
+            padding: 5px; /* 内边距 */
+            width: 80px; /* 宽度 */
+            height: 30px; /* 高度 */
+        }
+        .maindivider {
+        border-bottom: 2px solid #000; /* 设置为2像素宽的实线，颜色为黑色 */
+        margin-bottom: 20px; /* 增加下方的间距 */
+    }
+    /* 左侧框的样式 */
+    .box {
+        flex: 1; /* 设置弹性宽度为 1，使两个框平分页面 */
+        background-color: #f0f0f0; /* 设置背景颜色 */
+        padding: 20px; /* 设置内边距 */
+    }
+
+    /* 右侧框的样式 */
+    .box:last-child {
+        flex: 0 0 30%; /* 设置弹性宽度为 30%，固定宽度 */
+        background-color: #ffffff; /* 设置背景颜色为白色 */
+        padding: 10px; /* 设置内边距 */
+    }
+
+    .inner-container {
+        padding: 20px; /* 设置内边距，使内容与边框保持一定距离 */
+                justify-content: center;
+
+    }
+    .vertical-line {
+        border-right: 1px solid #ccc; /* 添加垂直分割线 */
+        height: 100%; /* 设置垂直分割线的高度为父元素高度 */
+        width: 10%;
+        margin: 0 10px; /* 设置左右边距 */
+    }
+    .options_sec {
+        width: 50px;
+        height:35px;
+        margin: 5px 4px;
+        align-items: center; 
+    }
+    .options_display {
+        width: 100px;
+        height:35px;
+        margin: 5px 4px;
+        align-items: center; 
+    }
+    .tenantView {
+    border: 2px solid black; /* 设置边框宽度、样式和颜色 */
+    padding: 10px; /* 可选，设置内边距以使内容不贴紧边框 */
+    /* 可选，更多样式设置，例如背景颜色、边框圆角等 */
+}
+
+    </style>
+</head>
+<!-- 10 16384 16389 -->
+
+<body>
+    <div class="myView">
+        <div id="container" class="box"></div>
+        <div id="controller" class="'box">
+            <div class="inner-container">
+                <div style="text-align: center">
+                    <h1> <b>Controller</b></h1>
+                </div>
+                <hr class="maindivider"> <!-- 分割线 -->
+                <div class="tenantView"> 
+                    <div class="strictboard">
+                        <div class="stricttext">
+                            <font> Update </font>
+                        </div>
+                        <div class="strictswitch">
+                            <input type="checkbox" class="switch" id="mySwitchUpdate" checked>
+                        </div>
+                    </div>
+                    <hr> <!-- 分割线 -->
+                    <div id = "interval_board">
+                        <div class="stricttext">
+                            <font> Update every  </font>
+                        </div>
+
+                        <div style="display: flex; align-items: center; justify-content: center;">
+                            <select id="options_sec" class="options_sec" onchange="setUpdateTime()"">
+                                <option value="0.2">0.2</option>
+                                <option value="0.5">0.5</option>
+                                <option value="1" selected>1</option>
+                                <option value="2">2</option>
+                                <option value="5">5</option>
+                                <option value="10">10</option>
+                            </select>
+                        </div>
+                        <div class="stricttext">
+                            <font> second  </font>
+                        </div>
+
+                    </div>
+                    <hr> <!-- 分割线 -->
+
+                    <div>
+                        <div class="stricttext", style="margin-bottom: 5px;">
+                            <font>Display Type</font>
+                        </div>
+                        <div class="select">
+                        <select id="options_display" onchange="setDisplay()"">
+                            <option value="1" selected>Percentage</option>
+                            <option value="2">Size</option>
+                        </select>
+                        </div>
+                    </div>
+                    <hr> <!-- 分割线 -->
+                    <div class="strictboard">
+                        <div class="stricttext">
+                            <font>Strict Mode </font>
+                        </div>
+                        <div class="strictswitch">
+                            <input type="checkbox" class="switch" id="mySwitch3" checked>
+                        </div>
+                    </div>
+                </div>
+                <hr> <!-- 分割线 -->
+
+                <div class="tenantView">
+                    <!-- <div class="myinput">
+                        <label>
+                            <font>Tenant</font>
+                        </label>
+                        <select id="options" class="options" onchange="getUserBuffer(); getUserBufferBought()"">
+                        </select>
+                    </div> -->
+
+                    <div class="select">
+                        <div class="stricttext" style="margin-bottom: 10px; margin-left:5px">
+                            <font >Tenant</font>
+                        </div>
+
+                        <select id="options">
+                        </select>
+                    </div>
+                    <hr> <!-- 分割线 -->
+    
+                    <div class="myinput">
+                        <form name="set_user_buffer" method="get">
+                            <label >
+                                <font>Set buffer bought:</font>
+                            </label><input name="number" />
+                            <input type="button" value="Set" style="font-size: small;" onclick="setUserBuffer()">    
+                        </form>
+                    </div>
+                    <hr> <!-- 分割线 -->
+    
+                    <div class="myinput">
+                        <label>
+                            <font>Tenant bought buffer size :</font>
+                        </label>
+                        <label class="textbox" id="textbox_bought">
+                            <!-- 这里显示文本 -->
+                            0
+                        </label>
+                    </div>
+                    <hr> <!-- 分割线 -->
+    
+                    <!-- <div class="myinput">
+                        <label>
+                            <font>Tenant occupied buffer size :</font>
+                        </label>
+                        <div class="textbox" id="textbox_occupied">
+                            0
+                        </div>
+                    </div> -->
+                </div>
+            </div>
+        </div>
+    </div>
+    <script language="JavaScript">
+        var chart = null, total = 0
+
+        var num = 1, myPath = 'http://172.18.166.156:8877/'
+        var users = null
+        var update = true
+        var time_interval = 1000
+        var display = 1
+        var dashStyles = ['Solid', 'ShortDash', 'ShortDot', 'ShortDashDot', 'ShortDashDotDot', 'Dot', 'Dash', 'LongDash', 'DashDot', 'LongDashDot', 'LongDashDotDot'];
+
+        $(document).ready(function () {
+
+            $('#mySwitch3').change(function () {
+                if ($(this).is(':checked')) {
+                    // 开关打开时执行的操作
+                    openStrict();
+                } else {
+                    // 开关关闭时执行的操作
+                    closeStrict();
+                }
+            });
+            $('#mySwitchUpdate').change(function () {
+                const element = document.getElementById("interval_board");
+
+                if ($(this).is(':checked')) {
+                    // 开关打开时执行的操作
+                    update = true
+
+                    // 或者
+                    element.style.pointerEvents = "auto"; // 启用点击事件
+
+                } else {
+                    // 开关关闭时执行的操作
+                    update = false
+                    // 设置元素是否可以点击
+                    element.style.pointerEvents = "none"; // 禁用点击事件
+                }
+            });
+            chart = Highcharts.chart('container', {
+                chart: {
+                    type: 'spline',
+                    animation: Highcharts.svg, // don't animate in IE < IE 10.
+                    marginRight: 10,
+                    events: {
+                        load: requestData
+                    }
+                },
+                boost: {
+                    useGPUTranslations: true
+                },
+                title: {
+                    text: 'Global Monitor',
+                    style: {
+                        fontSize: '50px'
+                    }
+                },
+                xAxis: {
+                    type: 'datetime',
+                    tickPixelInterval: 150,
+                    labels: {
+                        enabled: false
+                    }
+                },
+                yAxis: {
+                    title: {
+                        text: 'buffer occupancy Precent (%)',
+                        style: {
+                            fontSize: '30px'
+                        }
+                    },
+                    labels: {
+                        style: {
+                          fontSize: '30px' // 设置垂直坐标轴文字大小为14像素
+                        }
+                    },
+                    // min: 0,
+                    // max: 100,
+                    plotLines: [{
+                        value: 0,
+                        width: 1,
+                        color: '#808080'
+                    }]
+                },
+                tooltip: {
+                    formatter: function () {
+                        return '<b>' + this.series.name + '</b><br/>' +
+                            Highcharts.dateFormat('%Y-%m-%d %H:%M:%S', this.x) + '<br/>' +
+                            Highcharts.numberFormat(this.y, 2);
+                    }
+                },
+                plotOptions: {
+                    area: {
+                        pointStart: 1940,
+                        marker: {
+                            enabled: false,
+                            symbol: 'circle',
+                            radius: 2,
+                            states: {
+                                hover: {
+                                    enabled: true
+                                }
+                            }
+                        }
+                    },
+                    series: {
+                        animation: false,
+                        lineWidth:7
+                    }
+                },
+
+                legend: {
+                    enabled: true,
+                    labelFormatter: function () {
+                        return  this.name.charAt(0).toUpperCase() + this.name.slice(1);;
+                    },
+                    // layout: 'vertical',
+                    // align: 'right',
+                    // verticalAlign: 'bottom',
+                    borderWidth: 0,
+                    itemStyle: {
+                        fontSize: '30px' // 设置图例文字大小为14像素
+                    }
+
+                    // // x: -20,
+                    // // y: 0
+                },
+                exporting: {
+                    enabled: false
+                },
+                series: [],
+                credits: {
+                    enabled: false
+                }
+            });
+
+            Highcharts.setOptions({
+                global: {
+                    useUTC: false
+                }
+            });
+
+        });
+        function populateDropdown() {
+            const dropdown = document.getElementById("options");
+
+            // Clear existing options
+            dropdown.innerHTML = "";
+
+            // Add options from backendData
+            users.forEach(user => {
+                const optionElement = document.createElement("option");
+                optionElement.text = user.name;
+                dropdown.appendChild(optionElement);
+            });
+        }
+
+
+        function requestData() {
+            $.ajax({
+                url: myPath + 'info',
+                type: 'GET',
+                cache: false,
+                success: function (point) {
+                    var x = (new Date()).getTime(); // current time
+                    // 在运行时添加选项
+                    // Call the function to populate dropdown on page load
+                    if (users== null || users.length !== point.data.users.length) {
+                        users = point.data.users;
+                        populateDropdown();
+                    }
+                    if (update) {
+                        getTotal();
+                        getUserBuffer();
+                        getUserBufferBought();
+
+                        n = point.data.users.length
+                        for (var i = 0; i < n; ++i) {
+                            var cn = chart.series.length
+                            var user = point.data.users[i]
+
+                            var series = -1
+                            if (cn == i) {
+                                chart.addSeries({
+                                    name: user.name,
+                                    data: [],
+                                    dashStyle: dashStyles[i],
+                                    visible: false,
+                                    marker: {
+                                        enabled: false
+                                    }
+                                })
+                                series = chart.series[i]
+                            } else{
+                                series = chart.series[i]
+                                if (series.name != user.name) {
+                                    series.name = user.name
+                                    series.data = []
+                                    series.dashStyle = dashStyles[i]
+                                }
+                            }
+                            len = series.data.length;
+
+                            shift = len > 30; // 当数据点数量超过 20 个，则指定删除第一个点
+            
+
+                            for (var j = 0; j < len - 31; ++j) {
+                                series.removePoint(0, false, false)
+                            }
+
+                            // 新增点操作
+                            //具体的参数详见：https://api.hcharts.cn/highcharts#Series.addPoint
+
+                            // console.log('point: ', point.code, ' ', point.data, ' x: ', x)
+                            // y = Math.random() * 100;
+                            y = point.data.users[i].buffer;
+
+                            if (display == 1 ) {
+                                // y = (y / total * 100).toFixed(3)
+                                y = +(y / total * 100).toFixed(4)
+                            } else {
+                                y = + (y*8 / 1024).toFixed(4)
+                            }
+                            // console.log(y, +(y / total * 100).toFixed(4), len)
+                            chart.series[i].addPoint({ x: x, y: y }, true, shift);
+                        }
+                    }
+                    // 一秒后继续调用本函数
+                    setTimeout(requestData, time_interval);
+                },
+                cache: false
+            });
+        }
+        function setUpdateTime() {
+            const dropdown = document.getElementById("options_sec");
+            // 获取当前选中的选项的索引
+            const selectedIndex = dropdown.selectedIndex;
+
+            // 获取当前选中的选项的值
+            var selectedOption = dropdown.options[selectedIndex].value;
+            time_interval = selectedOption*1000
+
+        }
+        function setDisplay() {
+            const dropdown = document.getElementById("options_display");
+            // 获取当前选中的选项的索引
+            const selectedIndex = dropdown.selectedIndex;
+
+            // 获取当前选中的选项的值
+            var selectedOption = dropdown.options[selectedIndex].value;
+            if(selectedOption == 1) {
+                chart.update({
+                        yAxis: {
+                        title: {
+                        text: "buffer occupancy Precent (%)"
+                    }}});
+                display = 1
+            } else {
+
+                chart.update({
+                        yAxis: {
+                            title: {
+                                text: "buffer occupancy Size (MB)"
+                            },
+                            min: null,
+                            max: null
+                        }
+                    }
+                );
+                display = 2
+            }
+        }
+
+        function getTotal() {
+            $.ajax({
+                // url: 'http://172.18.166.156:8888/gettotal',
+                url: myPath + 'gettotal',
+                type: 'GET',
+                success: function (point) {
+                    console.log(point.data)
+                    total = point.data.result1
+                },
+                cache: false
+            });
+        }
+
+        function openStrict() {
+            $.ajax({
+                // url: 'http://172.18.166.156:8888/openStrict',
+                url: myPath + 'openStrict',
+                type: 'GET',
+                success: function (point) {
+                    console.log(point.data)
+                },
+                cache: false
+            });
+        }
+
+        function closeStrict() {
+            $.ajax({
+                // url: 'http://172.18.166.156:8888/closeStrict',
+                url: myPath + 'closeStrict',
+                type: 'GET',
+                success: function (point) {
+                    console.log(point.data)
+                },
+                cache: false
+            });
+        }
+
+        function setUserBuffer() {
+            if (set_user_buffer.number.value == "") {
+                alert("Input the bought number！")
+                set_user_buffer.number.focus();
+                return
+            }
+            const dropdown = document.getElementById("options");
+            // 获取当前选中的选项的索引
+            const selectedIndex = dropdown.selectedIndex;
+
+            // 获取当前选中的选项的值
+            const selectedOption = dropdown.options[selectedIndex].value;
+            user = null
+            users.forEach((u,i) => {
+                if (u.name == selectedOption) {
+                    user = u.id;
+                }
+            });
+            id = user;
+            $.ajax({
+                // url: 'http://172.18.166.156:8888/setUserBuffer',
+                url: myPath + 'setUserBuffer',
+                type: 'GET',
+                data: { 'user': id, 'number': set_user_buffer.number.value },
+                success: function (point) {
+                    console.log(point.data)
+                    alert("设置成功")
+                },
+                cache: false
+            });
+        }
+
+
+        function getUserBufferBought() {
+
+            const dropdown = document.getElementById("options");
+            // 获取当前选中的选项的索引
+            const selectedIndex = dropdown.selectedIndex;
+
+            // 获取当前选中的选项的值
+            const selectedOption = dropdown.options[selectedIndex].value;
+            user = null
+            users.forEach((u,i) => {
+                if (u.name == selectedOption) {
+                    user = u.id;
+                }
+            });
+            var textbox = document.getElementById("textbox_bought")
+            $.ajax({
+                // url: 'http://172.18.166.156:8888/getUserBoughtBuffer',
+                url: myPath + 'getUserBufferBought',
+                type: 'GET',
+                data: { 'user': user},
+                success: function (point) {
+                    console.log(point.data)
+                    // alert('该用户的购买数为' + point.data.result1)
+                    textbox.innerHTML = point.data.result1;
+                },
+                cache: false
+            });
+        }
+
+        function getUserBuffer() {
+
+            const dropdown = document.getElementById("options");
+            // 获取当前选中的选项的索引
+            const selectedIndex = dropdown.selectedIndex;
+
+            // 获取当前选中的选项的值
+            const selectedOption = dropdown.options[selectedIndex].value;
+            user = null
+            users.forEach((u,i) => {
+                if (u.name == selectedOption) {
+                    user = u.id;
+                }
+            });
+            // var textbox = document.getElementById("textbox_occupied")
+            // $.ajax({
+            //     // url: 'http://172.18.166.156:8888/getUserBuffer',
+            //     url: myPath + 'getUserBuffer',
+            //     type: 'GET',
+            //     data: { 'user': user},
+            //     success: function (point) {
+            //         console.log(point.data)
+            //         // alert('该用户的购买数为' + point.data.result1)
+            //         textbox.innerHTML = point.data.result1;
+            //     },
+            //     cache: false
+            // });
+        }
+    </script>
+</body>
+
+</html>

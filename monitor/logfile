@@ -1,0 +1,110 @@
+0 LOG:  [Alarm Module]can not read GAUSS_WARNING_TYPE env.
+	
+0 LOG:  [Alarm Module]Host Name: localhost.localdomain 
+	
+0 LOG:  [Alarm Module]Host IP: localhost.localdomain. Copy hostname directly in case of taking 10s to use 'gethostbyname' when /etc/hosts does not contain <HOST IP>
+	
+0 LOG:  [Alarm Module]Get ENV GS_CLUSTER_NAME failed!
+	
+0 LOG:  [Alarm Module]Invalid data in AlarmItem file! Read alarm English name failed! line: 57
+	
+0 WARNING:  failed to open feature control file, please check whether it exists: FileName=gaussdb.version, Errno=2, Errmessage=No such file or directory.
+0 WARNING:  failed to parse feature control file: gaussdb.version.
+0 WARNING:  Failed to load the product control file, so gaussdb cannot distinguish product version.
+0 LOG:  bbox_dump_path is set to /tmp/
+2024-03-14 21:55:12.865 [unknown] [unknown] localhost 140530666524928 0[0:0#0]  0 [BACKEND] LOG:  when starting as multi_standby mode, we couldn't support data replicaton.
+2024-03-14 21:55:12.865 [unknown] [unknown] localhost 140530666524928 0[0:0#0]  0 [BACKEND] LOG:  base_page_saved_interval is 400, ori is 400.
+2024-03-14 21:55:12.931 [unknown] [unknown] localhost 140530666524928 0[0:0#0]  0 [BACKEND] LOG:  [Alarm Module]can not read GAUSS_WARNING_TYPE env.
+	
+2024-03-14 21:55:12.931 [unknown] [unknown] localhost 140530666524928 0[0:0#0]  0 [BACKEND] LOG:  [Alarm Module]Host Name: localhost.localdomain 
+	
+2024-03-14 21:55:12.931 [unknown] [unknown] localhost 140530666524928 0[0:0#0]  0 [BACKEND] LOG:  [Alarm Module]Host IP: localhost.localdomain. Copy hostname directly in case of taking 10s to use 'gethostbyname' when /etc/hosts does not contain <HOST IP>
+	
+2024-03-14 21:55:12.931 [unknown] [unknown] localhost 140530666524928 0[0:0#0]  0 [BACKEND] LOG:  [Alarm Module]Get ENV GS_CLUSTER_NAME failed!
+	
+2024-03-14 21:55:12.931 [unknown] [unknown] localhost 140530666524928 0[0:0#0]  0 [BACKEND] LOG:  [Alarm Module]Invalid data in AlarmItem file! Read alarm English name failed! line: 57
+	
+2024-03-14 21:55:12.932 [unknown] [unknown] localhost 140530666524928 0[0:0#0]  0 [BACKEND] LOG:  loaded library "security_plugin"
+2024-03-14 21:55:12.933 [unknown] [unknown] localhost 140530666524928 0[0:0#0]  0 [BACKEND] WARNING:  could not create any HA TCP/IP sockets
+2024-03-14 21:55:12.933 [unknown] [unknown] localhost 140530666524928 0[0:0#0]  0 [BACKEND] WARNING:  could not create any HA TCP/IP sockets
+2024-03-14 21:55:12.933 [unknown] [unknown] localhost 140530666524928 0[0:0#0]  0 [BACKEND] LOG:  InitNuma numaNodeNum: 1 numa_distribute_mode: none inheritThreadPool: 0.
+2024-03-14 21:55:12.933 [unknown] [unknown] localhost 140530666524928 0[0:0#0]  0 [BACKEND] LOG:  reserved memory for backend threads is: 220 MB
+2024-03-14 21:55:12.933 [unknown] [unknown] localhost 140530666524928 0[0:0#0]  0 [BACKEND] LOG:  reserved memory for WAL buffers is: 128 MB
+2024-03-14 21:55:12.933 [unknown] [unknown] localhost 140530666524928 0[0:0#0]  0 [BACKEND] LOG:  Set max backend reserve memory is: 348 MB, max dynamic memory is: 8142 MB
+2024-03-14 21:55:12.933 [unknown] [unknown] localhost 140530666524928 0[0:0#0]  0 [BACKEND] LOG:  shared memory 3285 Mbytes, memory context 8490 Mbytes, max process memory 12288 Mbytes
+2024-03-14 21:55:12.933 [unknown] [unknown] localhost 140530666524928 0[0:0#0]  0 [BACKEND] LOG:  shared memory that key is 5432001 is owned by pid 2347762
+2024-03-14 21:55:13.448 [unknown] [unknown] localhost 140530666524928 0[0:0#0]  0 [CACHE] LOG:  set data cache  size(402653184)
+2024-03-14 21:55:13.477 [unknown] [unknown] localhost 140530666524928 0[0:0#0]  0 [SEGMENT_PAGE] LOG:  Segment-page constants: DF_MAP_SIZE: 8156, DF_MAP_BIT_CNT: 65248, DF_MAP_GROUP_EXTENTS: 4175872, IPBLOCK_SIZE: 8168, EXTENTS_PER_IPBLOCK: 1021, IPBLOCK_GROUP_SIZE: 4090, BMT_HEADER_LEVEL0_TOTAL_PAGES: 8323072, BktMapEntryNumberPerBlock: 2038, BktMapBlockNumber: 25, BktBitMaxMapCnt: 512
+2024-03-14 21:55:13.488 [unknown] [unknown] localhost 140530666524928 0[0:0#0]  0 [BACKEND] LOG:  gaussdb: fsync file "/opt/openGauss-ODBCtest/data1/gaussdb.state.temp" success
+2024-03-14 21:55:13.488 [unknown] [unknown] localhost 140530666524928 0[0:0#0]  0 [BACKEND] LOG:  create gaussdb state file success: db state(STARTING_STATE), server mode(Normal), connection index(1)
+2024-03-14 21:55:13.512 [unknown] [unknown] localhost 140530666524928 0[0:0#0]  0 [BACKEND] LOG:  max_safe_fds = 971, usable_fds = 1000, already_open = 19
+bbox_dump_path is set to /tmp/
+2024-03-14 21:55:13.514 [unknown] [unknown] localhost 140530666524928 0[0:0#0]  0 [BACKEND] LOG:  the configure file /opt/gs_origin/etc/gscgroup_dell.cfg doesn't exist or the size of configure file has changed. Please create it by root user!
+2024-03-14 21:55:13.514 [unknown] [unknown] localhost 140530666524928 0[0:0#0]  0 [BACKEND] LOG:  Failed to parse cgroup config file.
+2024-03-14 21:55:13.520 [unknown] [unknown] localhost 140530666524928 0[0:0#0]  0 [EXECUTOR] WARNING:  Failed to obtain environment value $GAUSSLOG!
+2024-03-14 21:55:13.520 [unknown] [unknown] localhost 140530666524928 0[0:0#0]  0 [EXECUTOR] DETAIL:  N/A
+2024-03-14 21:55:13.520 [unknown] [unknown] localhost 140530666524928 0[0:0#0]  0 [EXECUTOR] CAUSE:  Incorrect environment value.
+2024-03-14 21:55:13.520 [unknown] [unknown] localhost 140530666524928 0[0:0#0]  0 [EXECUTOR] ACTION:  Please refer to backend log for more details.
+2024-03-14 21:55:13.520 [unknown] [unknown] localhost 140530666524928 0[0:0#0]  0 [EXECUTOR] WARNING:  Failed to obtain environment value $GAUSSLOG!
+2024-03-14 21:55:13.520 [unknown] [unknown] localhost 140530666524928 0[0:0#0]  0 [EXECUTOR] DETAIL:  N/A
+2024-03-14 21:55:13.520 [unknown] [unknown] localhost 140530666524928 0[0:0#0]  0 [EXECUTOR] CAUSE:  Incorrect environment value.
+2024-03-14 21:55:13.520 [unknown] [unknown] localhost 140530666524928 0[0:0#0]  0 [EXECUTOR] ACTION:  Please refer to backend log for more details.
+2024-03-14 21:55:13.520 [unknown] [unknown] localhost 140530666524928 0[0:0#0]  0 [EXECUTOR] WARNING:  Failed to obtain environment value $GAUSSLOG!
+2024-03-14 21:55:13.520 [unknown] [unknown] localhost 140530666524928 0[0:0#0]  0 [EXECUTOR] DETAIL:  N/A
+2024-03-14 21:55:13.520 [unknown] [unknown] localhost 140530666524928 0[0:0#0]  0 [EXECUTOR] CAUSE:  Incorrect environment value.
+2024-03-14 21:55:13.520 [unknown] [unknown] localhost 140530666524928 0[0:0#0]  0 [EXECUTOR] ACTION:  Please refer to backend log for more details.
+0 LOG:  [Alarm Module]can not read GAUSS_WARNING_TYPE env.
+	
+0 LOG:  [Alarm Module]Host Name: localhost.localdomain 
+	
+0 LOG:  [Alarm Module]Host IP: localhost.localdomain. Copy hostname directly in case of taking 10s to use 'gethostbyname' when /etc/hosts does not contain <HOST IP>
+	
+0 LOG:  [Alarm Module]Get ENV GS_CLUSTER_NAME failed!
+	
+0 LOG:  [Alarm Module]Invalid data in AlarmItem file! Read alarm English name failed! line: 57
+	
+0 WARNING:  failed to open feature control file, please check whether it exists: FileName=gaussdb.version, Errno=2, Errmessage=No such file or directory.
+0 WARNING:  failed to parse feature control file: gaussdb.version.
+0 WARNING:  Failed to load the product control file, so gaussdb cannot distinguish product version.
+0 LOG:  bbox_dump_path is set to /tmp/
+2024-03-15 10:11:12.976 [unknown] [unknown] localhost 140007621619968 0[0:0#0]  0 [BACKEND] LOG:  when starting as multi_standby mode, we couldn't support data replicaton.
+2024-03-15 10:11:12.976 [unknown] [unknown] localhost 140007621619968 0[0:0#0]  0 [BACKEND] LOG:  base_page_saved_interval is 400, ori is 400.
+2024-03-15 10:11:13.042 [unknown] [unknown] localhost 140007621619968 0[0:0#0]  0 [BACKEND] LOG:  [Alarm Module]can not read GAUSS_WARNING_TYPE env.
+	
+2024-03-15 10:11:13.042 [unknown] [unknown] localhost 140007621619968 0[0:0#0]  0 [BACKEND] LOG:  [Alarm Module]Host Name: localhost.localdomain 
+	
+2024-03-15 10:11:13.042 [unknown] [unknown] localhost 140007621619968 0[0:0#0]  0 [BACKEND] LOG:  [Alarm Module]Host IP: localhost.localdomain. Copy hostname directly in case of taking 10s to use 'gethostbyname' when /etc/hosts does not contain <HOST IP>
+	
+2024-03-15 10:11:13.042 [unknown] [unknown] localhost 140007621619968 0[0:0#0]  0 [BACKEND] LOG:  [Alarm Module]Get ENV GS_CLUSTER_NAME failed!
+	
+2024-03-15 10:11:13.042 [unknown] [unknown] localhost 140007621619968 0[0:0#0]  0 [BACKEND] LOG:  [Alarm Module]Invalid data in AlarmItem file! Read alarm English name failed! line: 57
+	
+2024-03-15 10:11:13.043 [unknown] [unknown] localhost 140007621619968 0[0:0#0]  0 [BACKEND] LOG:  loaded library "security_plugin"
+2024-03-15 10:11:13.043 [unknown] [unknown] localhost 140007621619968 0[0:0#0]  0 [BACKEND] WARNING:  could not create any HA TCP/IP sockets
+2024-03-15 10:11:13.043 [unknown] [unknown] localhost 140007621619968 0[0:0#0]  0 [BACKEND] WARNING:  could not create any HA TCP/IP sockets
+2024-03-15 10:11:13.044 [unknown] [unknown] localhost 140007621619968 0[0:0#0]  0 [BACKEND] LOG:  InitNuma numaNodeNum: 1 numa_distribute_mode: none inheritThreadPool: 0.
+2024-03-15 10:11:13.044 [unknown] [unknown] localhost 140007621619968 0[0:0#0]  0 [BACKEND] LOG:  reserved memory for backend threads is: 220 MB
+2024-03-15 10:11:13.044 [unknown] [unknown] localhost 140007621619968 0[0:0#0]  0 [BACKEND] LOG:  reserved memory for WAL buffers is: 128 MB
+2024-03-15 10:11:13.044 [unknown] [unknown] localhost 140007621619968 0[0:0#0]  0 [BACKEND] LOG:  Set max backend reserve memory is: 348 MB, max dynamic memory is: 8142 MB
+2024-03-15 10:11:13.044 [unknown] [unknown] localhost 140007621619968 0[0:0#0]  0 [BACKEND] LOG:  shared memory 3285 Mbytes, memory context 8490 Mbytes, max process memory 12288 Mbytes
+2024-03-15 10:11:13.044 [unknown] [unknown] localhost 140007621619968 0[0:0#0]  0 [BACKEND] LOG:  shared memory that key is 5432001 is owned by pid 2475782
+2024-03-15 10:11:13.614 [unknown] [unknown] localhost 140007621619968 0[0:0#0]  0 [CACHE] LOG:  set data cache  size(402653184)
+2024-03-15 10:11:13.644 [unknown] [unknown] localhost 140007621619968 0[0:0#0]  0 [SEGMENT_PAGE] LOG:  Segment-page constants: DF_MAP_SIZE: 8156, DF_MAP_BIT_CNT: 65248, DF_MAP_GROUP_EXTENTS: 4175872, IPBLOCK_SIZE: 8168, EXTENTS_PER_IPBLOCK: 1021, IPBLOCK_GROUP_SIZE: 4090, BMT_HEADER_LEVEL0_TOTAL_PAGES: 8323072, BktMapEntryNumberPerBlock: 2038, BktMapBlockNumber: 25, BktBitMaxMapCnt: 512
+2024-03-15 10:11:13.654 [unknown] [unknown] localhost 140007621619968 0[0:0#0]  0 [BACKEND] LOG:  gaussdb: fsync file "/opt/openGauss-ODBCtest/data1/gaussdb.state.temp" success
+2024-03-15 10:11:13.655 [unknown] [unknown] localhost 140007621619968 0[0:0#0]  0 [BACKEND] LOG:  create gaussdb state file success: db state(STARTING_STATE), server mode(Normal), connection index(1)
+2024-03-15 10:11:13.693 [unknown] [unknown] localhost 140007621619968 0[0:0#0]  0 [BACKEND] LOG:  max_safe_fds = 968, usable_fds = 1000, already_open = 22
+bbox_dump_path is set to /tmp/
+2024-03-15 10:11:13.695 [unknown] [unknown] localhost 140007621619968 0[0:0#0]  0 [BACKEND] LOG:  the configure file /opt/gs_origin/etc/gscgroup_dell.cfg doesn't exist or the size of configure file has changed. Please create it by root user!
+2024-03-15 10:11:13.695 [unknown] [unknown] localhost 140007621619968 0[0:0#0]  0 [BACKEND] LOG:  Failed to parse cgroup config file.
+2024-03-15 10:11:13.701 [unknown] [unknown] localhost 140007621619968 0[0:0#0]  0 [EXECUTOR] WARNING:  Failed to obtain environment value $GAUSSLOG!
+2024-03-15 10:11:13.701 [unknown] [unknown] localhost 140007621619968 0[0:0#0]  0 [EXECUTOR] DETAIL:  N/A
+2024-03-15 10:11:13.701 [unknown] [unknown] localhost 140007621619968 0[0:0#0]  0 [EXECUTOR] CAUSE:  Incorrect environment value.
+2024-03-15 10:11:13.701 [unknown] [unknown] localhost 140007621619968 0[0:0#0]  0 [EXECUTOR] ACTION:  Please refer to backend log for more details.
+2024-03-15 10:11:13.701 [unknown] [unknown] localhost 140007621619968 0[0:0#0]  0 [EXECUTOR] WARNING:  Failed to obtain environment value $GAUSSLOG!
+2024-03-15 10:11:13.701 [unknown] [unknown] localhost 140007621619968 0[0:0#0]  0 [EXECUTOR] DETAIL:  N/A
+2024-03-15 10:11:13.701 [unknown] [unknown] localhost 140007621619968 0[0:0#0]  0 [EXECUTOR] CAUSE:  Incorrect environment value.
+2024-03-15 10:11:13.701 [unknown] [unknown] localhost 140007621619968 0[0:0#0]  0 [EXECUTOR] ACTION:  Please refer to backend log for more details.
+2024-03-15 10:11:13.701 [unknown] [unknown] localhost 140007621619968 0[0:0#0]  0 [EXECUTOR] WARNING:  Failed to obtain environment value $GAUSSLOG!
+2024-03-15 10:11:13.701 [unknown] [unknown] localhost 140007621619968 0[0:0#0]  0 [EXECUTOR] DETAIL:  N/A
+2024-03-15 10:11:13.701 [unknown] [unknown] localhost 140007621619968 0[0:0#0]  0 [EXECUTOR] CAUSE:  Incorrect environment value.
+2024-03-15 10:11:13.701 [unknown] [unknown] localhost 140007621619968 0[0:0#0]  0 [EXECUTOR] ACTION:  Please refer to backend log for more details.
